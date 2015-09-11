@@ -159,7 +159,7 @@ bio.hist <- function(usedata, xvar, xlabel, resultstr, resultx){
     scale_x_continuous(name = xlabel) +
     scale_y_continuous(name = 'Frequency') +
     annotate(geom = 'text', label = as.character(resultstr), x = resultx, y = Inf, vjust = 1.5, hjust = 1, size = 2.5) +
-    theme_bw() +
+    theme_minimal() +
     theme(axis.title = element_text(size = summaryhist.axis.title),
           axis.text = element_text(size = summaryhist.axis.text))
 }
@@ -178,7 +178,7 @@ bio.plots <- function(use.bio){
     scale_y_continuous(name = 'Frequency') +
     annotate(geom = 'text', label = use.desc$n.pct, x = max(use.daily$use.bio, na.rm = TRUE), y = Inf, vjust = 1.3, hjust = 1, size = 2.5) +
     ggtitle(toupper(gsub('\\.imp$', '', use.bio))) +
-    theme_bw() +
+    theme_minimal() +
     theme(title = element_text(hjust = 0, size = 18, face = 'bold'),
           axis.title = element_text(hjust = 0.5, vjust = 0.5, face = 'plain', size = 10),
           axis.text = element_text(size = histspag.axis.text))
@@ -187,7 +187,7 @@ bio.plots <- function(use.bio){
     geom_line(alpha = 0.15, colour = 'blue') +
     scale_x_continuous(breaks = c(1, 3, 5), name = 'Study Day') +
     scale_y_continuous(name = 'Biomarker Value') +
-    theme_bw() +
+    theme_minimal() +
     theme(axis.text = element_text(size = histspag.axis.text))
   
   bio.mean.hist <- bio.hist(usedata = use.summary, 'pt.mean', 'Patient Mean', use.desc$mean.desc, max(use.summary$pt.mean, na.rm = TRUE))
@@ -221,13 +221,102 @@ for(i in 1:length(all.bio.plots)){
 }
 dev.off()
 
-
 ```
 
-You can also embed plots, for example:
 
 ```{r, echo=FALSE}
-plot(cars)
+## -- Scatterplots and correlation statistics for day 1 values -- ##
+## Get all day 1 values into a matrix
+day1.data <- subset(brain.daily, study.day == 1)[,c(paste0(biomarker.list, '.imp'))]
+
+## All combinations of biomarkers
+marker.combs <- expand.grid(names(day1.data), names(day1.data))
+marker.combs$unique.comb <- unlist(lapply(1:nrow(marker.combs), FUN = function(i){
+  markervals <- c(as.character(marker.combs[i, 'Var1']), as.character(marker.combs[i, 'Var2']))
+  paste(sort(markervals), collapse = '_') }))
+markercomb.strsplit <- lapply(unique(marker.combs$unique.comb), FUN = strsplit, split = '_')
+marker.comb.unique <- data.frame(marker1 = unlist(lapply(markercomb.strsplit, FUN = function(x){ x[[1]][1] })),
+                                 marker2 = unlist(lapply(markercomb.strsplit, FUN = function(x){ x[[1]][2] })))
+marker.comb.unique <- subset(marker.comb.unique, marker1 != marker2)
+
+## Create matrix for multiplot: lower triangle is scatterplots, upper triangle is rho/Ps
+corrplotmat <- matrix(NA, ncol = length(biomarker.list), nrow = length(biomarker.list))
+corrplotmat[lower.tri(corrplotmat)] <- 1:sum(lower.tri(corrplotmat))
+corrplotmat[upper.tri(corrplotmat)] <- (sum(lower.tri(corrplotmat)) + 1):(sum(lower.tri(corrplotmat))*2)
+diag(corrplotmat) <- (sum(!is.na(corrplotmat)) + 1):length(corrplotmat)
+
+## Function to create scatterplot with smoother
+scattersmooth <- function(xvar, yvar){
+  if(xvar == yvar){
+    return(NULL)
+  } else{
+    usedata <- day1.data[,c(xvar, yvar)]
+    names(usedata) <- c('xvar', 'yvar')
+    
+    ggplot(aes(x = xvar, y = yvar), data = usedata) +
+      geom_point(size = 1, alpha = 0.2) +
+      geom_smooth(alpha = 0.2) +
+      # scale_x_continuous(name = xvar) +
+      # scale_y_continuous(name = yvar) +
+      theme_minimal() +
+      labs(x = NULL, y = NULL) +
+      theme(axis.text = element_blank(),
+            axis.ticks = element_blank(),
+            panel.grid = element_blank(),
+            plot.margin=unit(c(0,0,0,0),"mm"))
+  }
+}
+
+all.scatter <- lapply(1:nrow(marker.comb.unique), FUN = function(i){
+  scattersmooth(xvar = marker.comb.unique[i, 1], yvar = marker.comb.unique[i, 2])
+})
+
+## Function to create "plot" with rho, p-value
+rhop <- function(xvar, yvar){
+  if(xvar == yvar){
+    return(NULL)
+  } else{
+    usedata <- day1.data[,c(xvar, yvar)]
+    names(usedata) <- c('xvar', 'yvar')
+    
+    corrstats <- rcorr(as.matrix(usedata[,1:2]), type = 'spearman')
+    corrstr <- paste0('N: ', corrstats$n['xvar', 'yvar'],
+                      '\nR: ', round.format(corrstats$r['xvar', 'yvar'], dig = 2),
+                      '\nP: ', round.format(corrstats$P['xvar', 'yvar'], dig = 3))
+    ggplot(aes(x = xvar, y = yvar), data = usedata) +
+      annotate(geom = 'text', x = mean(usedata$xvar, na.rm = TRUE), y = mean(usedata$yvar, na.rm = TRUE), label = corrstr, size = 3) +
+      theme_minimal() +
+      theme(axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank(),
+            panel.grid = element_blank(),
+            plot.margin=unit(c(0,0,0,0),"mm"))
+  }
+}
+
+all.rho <- lapply(1:nrow(marker.comb.unique), FUN = function(i){
+  rhop(xvar = marker.comb.unique[i, 1], yvar = marker.comb.unique[i, 2])
+})
+
+## Create "plots" with text for biomarker labels to put on diagonals
+bio.plot.fakedata <- data.frame(xval = 1:10, yval = 1:10)
+bio.plots <- lapply(biomarker.list, FUN = function(marker){
+  ggplot(aes(x = xval, y = yval), data = bio.plot.fakedata) +
+      annotate(geom = 'text', x = 5.5, y = 5.5, label = toupper(marker), face = 'bold', colour = 'navy', size = 3.7) +
+      theme_minimal() +
+      theme(axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank(),
+            panel.grid = element_blank(),
+            plot.margin=unit(c(0,0,0,0),"mm"))
+})
+
+## Create final PDF
+pdf('scattercorr.pdf', width = 10.5, height = 8)
+multiplot(plotlist = c(all.scatter, all.rho, bio.plots),
+          layout = corrplotmat)
+dev.off()
+
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
