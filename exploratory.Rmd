@@ -80,13 +80,16 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 }
 ```
 
-We present descriptive statistics and data visualizations for the `r length(biomarker.list)` biomarkers collected in both the BRAIN-ICU and MIND-ICU cohorts. For speed and ease, only BRAIN-ICU data is included here, assuming that patterns will be similar for MIND-ICU.
+We present descriptive statistics and data visualizations for the `r length(biomarker.list)`
+biomarkers collected in both the BRAIN-ICU and MIND-ICU cohorts. For speed and ease, only BRAIN-ICU
+data is included here, assuming that patterns will be similar for MIND-ICU.
 
 ```{r descstats}
 ## -- Calculate mean, peak, minimum, change, and AUC of each biomarker for each patient -- ##
 bio.summary.pt <- brain.daily[,c('id', 'study.day', paste0(biomarker.list, '.imp'))] %>%
   gather(key = bio.marker, value = bio.value, crp.imp:tnfr1.imp) %>%
   filter(!is.na(bio.value)) %>%
+  arrange(id, study.day) %>%
   group_by(id, bio.marker) %>%
   summarise(pt.n = sum(!is.na(bio.value)),
             pt.mean = mean(bio.value, na.rm = TRUE),
@@ -150,15 +153,22 @@ histspag.axis.text <- 7
 summaryhist.axis.title <- 8
 summaryhist.axis.text <- 6
 
-## -- Function for summary statistic histograms -- ##
-bio.hist <- function(usedata, xvar, xlabel, resultstr, resultx){
+## -- Function to create histograms of summary statistics -- ##
+bio.hist <- function(usedata,   ## data set to use
+                     xvar,      ## character string - name of variable on X axis
+                     xlabel,    ## character string - label for X axis
+                     resultstr, ## character string - descriptive statistics
+                     resultx){  ## numeric - x value for placement of correlation results
+  ## Replace name of biomarker with "xvar" to allow use in ggplot
   names(usedata) <- gsub(xvar, 'xvar', names(usedata))
   
   ggplot(aes(x = xvar), data = usedata) +
     geom_histogram(fill = 'blue', alpha = 0.3) +
     scale_x_continuous(name = xlabel) +
     scale_y_continuous(name = 'Frequency') +
-    annotate(geom = 'text', label = as.character(resultstr), x = resultx, y = Inf, vjust = 1.5, hjust = 1, size = 2.5) +
+    ## Add descriptive statistics
+    annotate(geom = 'text', label = as.character(resultstr),
+             x = resultx, y = Inf, vjust = 1.5, hjust = 1, size = 2.5) +
     theme_minimal() +
     theme(axis.title = element_text(size = summaryhist.axis.title),
           axis.text = element_text(size = summaryhist.axis.text))
@@ -166,23 +176,32 @@ bio.hist <- function(usedata, xvar, xlabel, resultstr, resultx){
 
 ## -- Function to create all plots for a given biomarker -- ##
 bio.plots <- function(use.bio){
+  ## Select only data needed for plots: id, study day, biomarker specified
   use.daily <- brain.daily[brain.daily$study.day %in% c(1, 3, 5), c('id', 'study.day', use.bio)]
+  ## Replace actual biomarker name with generic "use.bio" to use in ggplot
   names(use.daily) <- gsub(use.bio, 'use.bio', names(use.daily))
   
+  ## Get summary values, descriptive statistics for specified biomarker
   use.summary <- bio.summary.pt[bio.summary.pt$bio.marker == use.bio,]
   use.desc <- bio.summary[bio.summary$bio.marker == use.bio,]
   
-  bio.hist <- ggplot(aes(x = use.bio), data = use.daily) +
+  ## Create histogram of all biomarker values, regardless of study day
+  bio.hist.all <- ggplot(aes(x = use.bio), data = use.daily) +
     geom_histogram(alpha = 0.3, fill = 'blue') +
     scale_x_continuous(name = 'Biomarker Value, All Study Days') +
     scale_y_continuous(name = 'Frequency') +
-    annotate(geom = 'text', label = use.desc$n.pct, x = max(use.daily$use.bio, na.rm = TRUE), y = Inf, vjust = 1.3, hjust = 1, size = 2.5) +
+    ## Add number of measurements per patient
+    annotate(geom = 'text', label = use.desc$n.pct,
+             x = max(use.daily$use.bio, na.rm = TRUE), y = Inf,
+             vjust = 1.3, hjust = 1, size = 2.5) +
+    ## Add title - biomarker name
     ggtitle(toupper(gsub('\\.imp$', '', use.bio))) +
     theme_minimal() +
     theme(title = element_text(hjust = 0, size = 18, face = 'bold'),
           axis.title = element_text(hjust = 0.5, vjust = 0.5, face = 'plain', size = 10),
           axis.text = element_text(size = histspag.axis.text))
   
+  ## Create spaghetti plot of biomarker value by study day per patient
   bio.spaghetti <- ggplot(aes(x = study.day, y = use.bio, group = id), data = use.daily) +
     geom_line(alpha = 0.15, colour = 'blue') +
     scale_x_continuous(breaks = c(1, 3, 5), name = 'Study Day') +
@@ -190,13 +209,24 @@ bio.plots <- function(use.bio){
     theme_minimal() +
     theme(axis.text = element_text(size = histspag.axis.text))
   
-  bio.mean.hist <- bio.hist(usedata = use.summary, 'pt.mean', 'Patient Mean', use.desc$mean.desc, max(use.summary$pt.mean, na.rm = TRUE))
-  bio.min.hist <- bio.hist(usedata = use.summary, 'pt.min', 'Patient Minimum', use.desc$min.desc, max(use.summary$pt.min, na.rm = TRUE))
-  bio.max.hist <- bio.hist(usedata = use.summary, 'pt.max', 'Patient Maximum', use.desc$max.desc, max(use.summary$pt.max, na.rm = TRUE))
-  bio.delta.hist <- bio.hist(usedata = use.summary, 'pt.delta', 'Patient Change, Last - First', use.desc$delta.desc, max(use.summary$pt.delta, na.rm = TRUE))
-  bio.auc.hist <- bio.hist(usedata = use.summary, 'pt.auc', 'Patient AUC', use.desc$auc.desc, max(use.summary$pt.auc, na.rm = TRUE))
+  ## Create histograms of summary values (mean, min, max, delta, AUC)
+  bio.mean.hist <- bio.hist(usedata = use.summary,
+                            'pt.mean', 'Patient Mean',
+                            use.desc$mean.desc, max(use.summary$pt.mean, na.rm = TRUE))
+  bio.min.hist <- bio.hist(usedata = use.summary,
+                           'pt.min', 'Patient Minimum',
+                           use.desc$min.desc, max(use.summary$pt.min, na.rm = TRUE))
+  bio.max.hist <- bio.hist(usedata = use.summary,
+                           'pt.max', 'Patient Maximum',
+                           use.desc$max.desc, max(use.summary$pt.max, na.rm = TRUE))
+  bio.delta.hist <- bio.hist(usedata = use.summary,
+                             'pt.delta', 'Patient Change, Last - First',
+                             use.desc$delta.desc, max(use.summary$pt.delta, na.rm = TRUE))
+  bio.auc.hist <- bio.hist(usedata = use.summary,
+                           'pt.auc', 'Patient AUC',
+                           use.desc$auc.desc, max(use.summary$pt.auc, na.rm = TRUE))
   
-  return(list('total.hist' = bio.hist,
+  return(list('total.hist' = bio.hist.all,
               'spaghetti' = bio.spaghetti,
               'mean.hist' = bio.mean.hist,
               'min.hist' = bio.min.hist,
@@ -205,6 +235,7 @@ bio.plots <- function(use.bio){
               'auc.hist' = bio.auc.hist))
 }
 
+## Create list with one element per biomarker, each element has all plots for that marker
 all.bio.plots <- lapply(paste0(biomarker.list, '.imp'), bio.plots)
 
 ## -- Function to plot all six plots per biomarker using multiplot() -- ##
@@ -229,23 +260,29 @@ dev.off()
 ## Get all day 1 values into a matrix
 day1.data <- subset(brain.daily, study.day == 1)[,c(paste0(biomarker.list, '.imp'))]
 
-## All combinations of biomarkers
+## -- Get data frame with all unique combinations of biomarkers -- ##
+## Use expand.grid to get all unique combinations, but includes duplicates
 marker.combs <- expand.grid(names(day1.data), names(day1.data))
+
+## Create new variable that is *sorted* marker1_marker2
 marker.combs$unique.comb <- unlist(lapply(1:nrow(marker.combs), FUN = function(i){
   markervals <- c(as.character(marker.combs[i, 'Var1']), as.character(marker.combs[i, 'Var2']))
   paste(sort(markervals), collapse = '_') }))
+
+## Use strsplit to get all sorted combinations of biomarkers, then take all unique values
 markercomb.strsplit <- lapply(unique(marker.combs$unique.comb), FUN = strsplit, split = '_')
-marker.comb.unique <- data.frame(marker1 = unlist(lapply(markercomb.strsplit, FUN = function(x){ x[[1]][1] })),
-                                 marker2 = unlist(lapply(markercomb.strsplit, FUN = function(x){ x[[1]][2] })))
+marker.comb.unique <-
+  data.frame(marker1 = unlist(lapply(markercomb.strsplit, FUN = function(x){ x[[1]][1] })),
+             marker2 = unlist(lapply(markercomb.strsplit, FUN = function(x){ x[[1]][2] })))
 marker.comb.unique <- subset(marker.comb.unique, marker1 != marker2)
 
-## Create matrix for multiplot: lower triangle is scatterplots, upper triangle is rho/Ps
+## -- Create matrix for multiplot: lower triangle is scatterplots, upper triangle is rho/Ps -- ##
 corrplotmat <- matrix(NA, ncol = length(biomarker.list), nrow = length(biomarker.list))
 corrplotmat[lower.tri(corrplotmat)] <- 1:sum(lower.tri(corrplotmat))
 corrplotmat[upper.tri(corrplotmat)] <- (sum(lower.tri(corrplotmat)) + 1):(sum(lower.tri(corrplotmat))*2)
 diag(corrplotmat) <- (sum(!is.na(corrplotmat)) + 1):length(corrplotmat)
 
-## Function to create scatterplot with smoother
+## Function to create scatterplot with smoother, given an X and Y biomarker
 scattersmooth <- function(xvar, yvar){
   if(xvar == yvar){
     return(NULL)
@@ -256,8 +293,6 @@ scattersmooth <- function(xvar, yvar){
     ggplot(aes(x = xvar, y = yvar), data = usedata) +
       geom_point(size = 1, alpha = 0.2) +
       geom_smooth(alpha = 0.2) +
-      # scale_x_continuous(name = xvar) +
-      # scale_y_continuous(name = yvar) +
       theme_minimal() +
       labs(x = NULL, y = NULL) +
       theme(axis.text = element_blank(),
@@ -271,7 +306,7 @@ all.scatter <- lapply(1:nrow(marker.comb.unique), FUN = function(i){
   scattersmooth(xvar = marker.comb.unique[i, 1], yvar = marker.comb.unique[i, 2])
 })
 
-## Function to create "plot" with rho, p-value
+## Function to create "plot" with rho, p-value, given an X and Y biomarker
 rhop <- function(xvar, yvar){
   if(xvar == yvar){
     return(NULL)
@@ -284,7 +319,8 @@ rhop <- function(xvar, yvar){
                       '\nR: ', round.format(corrstats$r['xvar', 'yvar'], dig = 2),
                       '\nP: ', round.format(corrstats$P['xvar', 'yvar'], dig = 3))
     ggplot(aes(x = xvar, y = yvar), data = usedata) +
-      annotate(geom = 'text', x = mean(usedata$xvar, na.rm = TRUE), y = mean(usedata$yvar, na.rm = TRUE), label = corrstr, size = 3) +
+      annotate(geom = 'text', label = corrstr, size = 3,
+               x = mean(usedata$xvar, na.rm = TRUE), y = mean(usedata$yvar, na.rm = TRUE)) +
       theme_minimal() +
       theme(axis.title = element_blank(),
             axis.text = element_blank(),
@@ -302,7 +338,8 @@ all.rho <- lapply(1:nrow(marker.comb.unique), FUN = function(i){
 bio.plot.fakedata <- data.frame(xval = 1:10, yval = 1:10)
 bio.plots <- lapply(biomarker.list, FUN = function(marker){
   ggplot(aes(x = xval, y = yval), data = bio.plot.fakedata) +
-      annotate(geom = 'text', x = 5.5, y = 5.5, label = toupper(marker), face = 'bold', colour = 'navy', size = 3.7) +
+      annotate(geom = 'text', label = toupper(marker),
+               x = 5.5, y = 5.5, face = 'bold', colour = 'navy', size = 3.7) +
       theme_minimal() +
       theme(axis.title = element_blank(),
             axis.text = element_blank(),
@@ -318,5 +355,3 @@ multiplot(plotlist = c(all.scatter, all.rho, bio.plots),
 dev.off()
 
 ```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
