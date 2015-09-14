@@ -279,7 +279,9 @@ marker.comb.unique <- subset(marker.comb.unique, marker1 != marker2)
 ## -- Create matrix for multiplot: lower triangle is scatterplots, upper triangle is rho/Ps -- ##
 corrplotmat <- matrix(NA, ncol = length(biomarker.list), nrow = length(biomarker.list))
 corrplotmat[lower.tri(corrplotmat)] <- 1:sum(lower.tri(corrplotmat))
-corrplotmat[upper.tri(corrplotmat)] <- (sum(lower.tri(corrplotmat)) + 1):(sum(lower.tri(corrplotmat))*2)
+corrplotmat <- t(corrplotmat)
+corrplotmat[lower.tri(corrplotmat)] <- 1:sum(lower.tri(corrplotmat))
+corrplotmat[upper.tri(corrplotmat)] <- corrplotmat[upper.tri(corrplotmat)] + sum(lower.tri(corrplotmat))
 diag(corrplotmat) <- (sum(!is.na(corrplotmat)) + 1):length(corrplotmat)
 
 ## Function to create scatterplot with smoother, given an X and Y biomarker
@@ -352,6 +354,14 @@ bio.plots <- lapply(biomarker.list, FUN = function(marker){
 pdf('scattercorr.pdf', width = 10.5, height = 8)
 multiplot(plotlist = c(all.scatter, all.rho, bio.plots),
           layout = corrplotmat)
+dev.off()
+
+```
+
+```r varclus```
+pdf(file = 'biomarker_varclus.pdf', width = 7, height = 6, onefile = TRUE)
+plot(varclus(as.matrix(day1.data))) + title('Spearman rho')
+plot(varclus(as.matrix(day1.data), similarity = 'hoeffding')) + title("Hoeffding's D")
 dev.off()
 
 ```
