@@ -358,10 +358,73 @@ dev.off()
 
 ```
 
-```r varclus```
+```{r varclus}
 pdf(file = 'biomarker_varclus.pdf', width = 7, height = 6, onefile = TRUE)
 plot(varclus(as.matrix(day1.data))) + title('Spearman rho')
 plot(varclus(as.matrix(day1.data), similarity = 'hoeffding')) + title("Hoeffding's D")
+dev.off()
+
+```
+
+```{r redundancy}
+## Create data set to use for redundancy analyses
+brain.daily.use <- brain.daily[brain.daily$study.day %in% c(1, 3, 5),
+                               c('id', 'study.day', paste0(biomarker.list, '.imp'))]
+
+## -- Function to print redun() results in ggplot form -- ##
+redun.ggplot <- function(redun.obj){
+  redun.rsq <- sort(redun.obj$rsq1, decreasing = FALSE)
+  redun.data <- data.frame(var = names(redun.rsq),
+                           rsq = as.numeric(redun.rsq),
+                           index = 1:length(redun.rsq))
+  redun.plot <- ggplot(aes(x = rsq, y = index), data = redun.data) +
+                  geom_point() +
+                  scale_x_continuous(limits = c(0, 1)) +
+                  scale_y_continuous(limits = c(1, length(redun.rsq)),
+                                     breaks = 1:length(redun.rsq),
+                                     labels = redun.data$var) +
+                  xlab(expression(R^2)) +
+                  ylab('')
+  return(redun.plot)
+}
+
+## -- Specify R2 cutoff -- ##
+r2.min <- 0.6
+
+## Redundancy analyses
+allbio.redun <- redun(as.formula(paste('~ ', paste(paste0(biomarker.list, '.imp'), collapse = ' + '))),
+                      data = brain.daily.use,
+                      nk = 5,
+                      r2 = r2.min)
+allbio.redun.plot <- redun.ggplot(allbio.redun)
+
+day1bio.redun <- redun(as.formula(paste('~ ', paste(paste0(biomarker.list, '.imp'), collapse = ' + '))),
+                       data = subset(brain.daily.use, study.day == 1),
+                       nk = 5,
+                       r2 = r2.min)
+day1bio.redun.plot <- redun.ggplot(day1bio.redun)
+
+## Create plot with both versions on a single panel, sorted by "all days" R2
+rsq.order <- data.frame(marker = names(allbio.redun$rsq1),
+                        marker.order = order(allbio.redun$rsq1, decreasing = FALSE))
+
+all.redun.rsq <- data.frame(marker = rep(names(sort(allbio.redun$rsq1)), 2))
+all.redun.rsq$rsq.val <- c(allbio.redun$rsq1[all.redun.rsq$marker[1:length(allbio.redun$rsq1)]],
+                           day1bio.redun$rsq1[all.redun.rsq$marker[1:length(day1bio.redun$rsq1)]])
+all.redun.rsq$which.rsq <- factor(c(rep('All study days', length(names(allbio.redun$rsq1))),
+                                    (rep('Day 1 only', length(names(allbio.redun$rsq1))))))
+all.redun.rsq$plot.order <- rep(1:length(allbio.redun$rsq1), 2)
+
+pdf(file = 'redundancy.pdf', width = 6, height = 6)
+ggplot(aes(x = rsq.val, y = plot.order, colour = which.rsq), data = all.redun.rsq) +
+  geom_point(size = 3, alpha = 0.7) +
+  scale_colour_discrete(name = 'Days used') +
+  scale_x_continuous(limits = 0:1, name = expression(R^2)) +
+  scale_y_continuous(name = '',
+                     breaks = unique(all.redun.rsq$plot.order),
+                     labels = toupper(gsub('\\.imp$', '', all.redun.rsq$marker[1:length(allbio.redun$rsq1)]))) +
+  theme_minimal() +
+  theme(legend.position = c(1, 0), legend.justification = c(1, 0), axis.ticks = element_blank())
 dev.off()
 
 ```
