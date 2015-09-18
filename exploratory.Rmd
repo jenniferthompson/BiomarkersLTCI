@@ -293,11 +293,11 @@ corrplotmat[upper.tri(corrplotmat)] <- corrplotmat[upper.tri(corrplotmat)] + sum
 diag(corrplotmat) <- (sum(!is.na(corrplotmat)) + 1):length(corrplotmat)
 
 ## Function to create scatterplot with smoother, given an X and Y biomarker
-scattersmooth <- function(xvar, yvar){
+scattersmooth <- function(xvar, yvar, dataset){
   if(xvar == yvar){
     return(NULL)
   } else{
-    usedata <- day1.data[,c(xvar, yvar)]
+    usedata <- dataset[,c(xvar, yvar)]
     names(usedata) <- c('xvar', 'yvar')
     
     ggplot(aes(x = xvar, y = yvar), data = usedata) +
@@ -313,15 +313,17 @@ scattersmooth <- function(xvar, yvar){
 }
 
 all.scatter <- lapply(1:nrow(marker.comb.unique), FUN = function(i){
-  scattersmooth(xvar = marker.comb.unique[i, 1], yvar = marker.comb.unique[i, 2])
+  scattersmooth(xvar = marker.comb.unique[i, 1],
+                yvar = marker.comb.unique[i, 2],
+                dataset = day1.data)
 })
 
 ## Function to create "plot" with rho, p-value, given an X and Y biomarker
-rhop <- function(xvar, yvar){
+rhop <- function(xvar, yvar, dataset){
   if(xvar == yvar){
     return(NULL)
   } else{
-    usedata <- day1.data[,c(xvar, yvar)]
+    usedata <- dataset[,c(xvar, yvar)]
     names(usedata) <- c('xvar', 'yvar')
     
     corrstats <- rcorr(as.matrix(usedata[,1:2]), type = 'spearman')
@@ -341,7 +343,9 @@ rhop <- function(xvar, yvar){
 }
 
 all.rho <- lapply(1:nrow(marker.comb.unique), FUN = function(i){
-  rhop(xvar = marker.comb.unique[i, 1], yvar = marker.comb.unique[i, 2])
+  rhop(xvar = marker.comb.unique[i, 1],
+       yvar = marker.comb.unique[i, 2],
+       dataset = day1.data)
 })
 
 ## Create "plots" with text for biomarker labels to put on diagonals
@@ -552,5 +556,96 @@ ggplot(aes(x = as.numeric(pctile), y = auc.value, group = biomarker, colour = bi
   theme_bw()
 # dev.off()
 
+```
+
+```{r corrmarkermeasures}
+#### Correlations and scatterplots for each summary measurement for each biomarker; should inform
+####  discussion about which summary measures to look at
+
+## -- Plot setup -- ##
+## Create vector of summary measure variable names, data frame of all possible combinations (numeric)
+summary.measure.list <- setdiff(names(bio.summary.pt), c('id', 'bio.marker', 'pt.n'))
+n.summeasures <- length(summary.measure.list)
+summeasures.num <- bind_rows(lapply(1:(n.summeasures - 1), FUN = function(i){
+  data.frame(var1 = rep(i, n.summeasures - i),
+             var2 = (i + 1):n.summeasures)
+}))
+
+## -- Create matrix for multiplot: lower triangle is scatterplots, upper triangle is rho/Ps -- ##
+sumcorrplotmat <- matrix(NA, ncol = length(summary.measure.list), nrow = length(summary.measure.list))
+sumcorrplotmat[lower.tri(sumcorrplotmat)] <- 1:sum(lower.tri(sumcorrplotmat))
+sumcorrplotmat <- t(sumcorrplotmat)
+sumcorrplotmat[lower.tri(sumcorrplotmat)] <- 1:sum(lower.tri(sumcorrplotmat))
+sumcorrplotmat[upper.tri(sumcorrplotmat)] <- sumcorrplotmat[upper.tri(sumcorrplotmat)] + sum(lower.tri(sumcorrplotmat))
+diag(sumcorrplotmat) <- (sum(!is.na(sumcorrplotmat)) + 1):length(sumcorrplotmat)
+
+## Add a row at the top for biomarker name plot
+sumcorrplotmat <- rbind(c(rep((max(sumcorrplotmat) + 1), 2),
+                          seq((max(sumcorrplotmat) + 2), by = 1, length.out = (ncol(sumcorrplotmat) - 2))),
+                        sumcorrplotmat)
+
+
+sumcorr.marker <- function(marker){
+  ## Create "plots" with text for biomarker label for title
+  sum.bio.labels <- c(toupper(marker), rep('', length(summary.measure.list) - 2))
+  sum.bio.plots <- lapply(sum.bio.labels, FUN = function(markertext){
+    ggplot(aes(x = xval, y = yval), data = bio.plot.fakedata) +
+      annotate(geom = 'text', label = markertext,
+               x = 0, y = 0, hjust = 0, vjust = 0, fontface = 'bold', size = 10) +
+      scale_x_continuous(expand = c(0, 0), limits = c(0, 10)) +
+      scale_y_continuous(expand = c(0, 0), limits = c(0, 5)) +
+      theme_minimal() +
+      theme(axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank(),
+            panel.grid = element_blank(),
+            plot.margin=unit(c(0,0,0,0),"mm"))
+  })
+
+  ## Create scatterplots with smoother
+  sum.scatter <- lapply(1:nrow(summeasures.num), FUN = function(i){
+    scattersmooth(xvar = summary.measure.list[as.numeric(summeasures.num[i, 1])],
+                  yvar = summary.measure.list[as.numeric(summeasures.num[i, 2])],
+                  dataset = subset(bio.summary.pt, bio.marker == paste0(marker, '.imp')))
+  })
+
+  ## Create "plots" with N, rho, p  
+  sum.rho <- lapply(1:nrow(summeasures.num), FUN = function(i){
+    rhop(xvar = summary.measure.list[as.numeric(summeasures.num[i, 1])],
+         yvar = summary.measure.list[as.numeric(summeasures.num[i, 2])],
+         dataset = subset(bio.summary.pt, bio.marker == paste0(marker, '.imp')))
+  })
+  
+  ## Create "plots" with text for summary measure to put on diagonals
+  sum.plots <- lapply(summary.measure.list, FUN = function(measure){
+    ggplot(aes(x = xval, y = yval), data = bio.plot.fakedata) +
+      annotate(geom = 'text', label = capitalize(gsub('^pt\\.', '', measure)),
+               x = 5.5, y = 5.5, face = 'bold', colour = 'navy', size = 3.7) +
+      theme_minimal() +
+      theme(axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank(),
+            panel.grid = element_blank(),
+            plot.margin=unit(c(0,0,0,0),"mm"))
+  })
+  
+  return(list('scatterplots' = sum.scatter,
+              'rhoplots' = sum.rho,
+              'measureplots' = sum.plots,
+              'titleplots' = sum.bio.plots))
+}
+
+bio.summary.plots <- lapply(biomarker.list, FUN = sumcorr.marker)
+
+## Create final PDF
+pdf('summaryplots.pdf', width = 9, height = 8)
+for(i in 1:length(bio.summary.plots)){
+  multiplot(plotlist = c(bio.summary.plots[[i]]$scatterplots,
+                         bio.summary.plots[[i]]$rhoplots,
+                         bio.summary.plots[[i]]$measureplots,
+                         bio.summary.plots[[i]]$titleplots),
+            layout = sumcorrplotmat)
+}
+dev.off()
 
 ```
