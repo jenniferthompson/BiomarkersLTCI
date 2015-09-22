@@ -1,0 +1,276 @@
+%% -- Specially formatted Latex comment tells RStudio to compile PDF with knitr
+% !Rnw weave = knitr
+
+\documentclass{article}
+
+%\usepackage[margin=.5in, landscape]{geometry} %resets margins
+\usepackage[margin=.5in]{geometry} %resets margins
+\usepackage{hyperref}
+\usepackage{pdfpages}
+
+\title{BRAIN-ICU: Biomarkers vs. Long-Term Cognitive and Functional Outcomes}
+\date{\today}
+\author{Jennifer Thompson, MPH; Supervisor: Rameela Chandrasekhar, PhD}
+\begin{document}
+\maketitle
+\tableofcontents
+\clearpage
+
+<<setup, include=FALSE, results='hide', cache=FALSE>>=
+opts_chunk$set(echo=FALSE, warning = FALSE, message = FALSE, cache = FALSE, error = FALSE, results='hide')
+options(replace.assign = TRUE, width = 90)
+
+library(rms)
+library(caTools)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+@
+
+<<loaddata>>=
+## Create vector of variable names of each biomarker
+biomarker.vnames <- paste0(c('crp', 'ifngamma', 'il10', 'il12', 'il1b', 'il6', 'il8', 'mmp9',
+                             'proteinc', 'tnfa', 'tnfr1'),
+                           '.imp')
+
+## Load all BRAIN data
+if(Sys.info()['sysname'] == 'Darwin'){
+  load('/Volumes/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
+  source('/Volumes/thomps23/R/multiplot.r')
+} else{
+  load('/home/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
+  source('/home/thomps23/R/multiplot.r')
+}
+
+## -- Insert data management to combine BRAIN, MIND data sets --------------------------------------
+
+## For now...
+all.oneobs <- brain.oneobs
+all.daily <- brain.daily
+all.fu <- brain.fu
+
+## Create cube root versions of all mean 24h ICU drug variables
+all.oneobs$mean.benz.cube <- all.oneobs$mean.benz.icu^(1/3)
+all.oneobs$mean.op.cube <- all.oneobs$mean.op.new.icu^(1/3)
+all.oneobs$mean.prop.cube <- all.oneobs$mean.prop.icu^(1/3)
+all.oneobs$mean.dex.cube <- all.oneobs$mean.dex.icu^(1/3)
+all.oneobs$mean.hal.cube <- all.oneobs$mean.hal.icu^(1/3)
+
+label(all.oneobs$mean.benz.cube) <- 'Mean 24h benzos in ICU, cube root'
+label(all.oneobs$mean.op.cube) <- 'Mean 24h opioids in ICU, cube root'
+label(all.oneobs$mean.prop.cube) <- 'Mean 24h propofol in ICU, cube root'
+label(all.oneobs$mean.dex.cube) <- 'Mean 24h dex in ICU, cube root'
+label(all.oneobs$mean.hal.cube) <- 'Mean 24h haldol in ICU, cube root'
+
+@
+
+The following analyses examine the associations between a panel of \Sexpr{length(biomarker.vnames)}
+biomarkers measured in the BRAIN-ICU and MIND-ICU cohorts and long-term cognitive and functional
+outcomes.
+
+\section{Cohort Definitions}
+Cohorts are defined separately for each time point (3 and 12 months) and for cognitive and
+functional outcomes, since patients could have at least some functional testing done by phone.
+Patients are included in the cognitive cohort if they had at least one cognitive test performed at
+the specified time point (including any RBANS domains, Trails A, Trails B and/or MMSE). Patients
+are included in the functional cohort if they had at least one functional test performed at the
+specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA frailty).
+
+\section{Model Weighting}
+Each model is performed on all survivors in the followup cohort of interest. In order to address
+survivor selection bias - i.e., the fact that patients who are alive and have long-term followup
+data are likely different than patients who do not - we also added inverse probability weights to
+each model in a second version. These weights are calculated by modeling the probability that each
+patient in the original in-hospital cohort contributes to each followup cohort, then taking the
+inverse of this estimated weight. In our weighting mdoels, we included age; Charlson score;
+education; IQCODE; Framingham stroke risk score; mean 24-hour doses of benzodiazepines, opioids,
+propofol, dexmedetomidine, and haloperidol (cube root transformed); duration of severe sepsis,
+delirium, and coma; and mean modified SOFA.
+
+Figure \ref{fig:weighthist} shows the distribution of these inverse probability weights and the
+number of patients included in the final cohorts.
+
+<<datamgmt>>=
+## -- Indicators for whether each patient is in cognitive or functional analysis cohort at each time
+## Create vectors of tests included in "partial data" criteria at each time point for each cohort
+cog.varnames <- c('rbans.global.score', 'rbans.immmemory.tscore', 'rbans.visuo.tscore',
+                  'rbans.delayedmem.tscore', 'rbans.language.tscore', 'trail.a.tscore',
+                  'trail.b.tscore', 'mmse.tscore')
+func.varnames <- c('bdi.totscore', 'pcl.totscore', 'adl.totscore', 'faq.totscore',
+                   'sf36.pcs', 'sf36.mcs', 'frailty.fu')
+
+## Which patients/time points have at least partial cognitive or functional data?
+all.fu$has.cog.data <- rowSums(!is.na(all.fu[,cog.varnames])) > 0
+all.fu$has.func.data <- rowSums(!is.na(all.fu[,func.varnames])) > 0
+
+## Create indicators for whether patient is in cohort at each time
+all.oneobs$cog.cohort.3 <-
+  all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.cog.data)$id
+all.oneobs$cog.cohort.12 <-
+  all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.cog.data)$id
+all.oneobs$func.cohort.3 <-
+  all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.func.data)$id
+all.oneobs$func.cohort.12 <-
+  all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.func.data)$id
+
+## -- Calculate summary values for each biomarker for each patient ----------------------------------
+bio.summary.pt <- all.daily[,c('id', 'study.day', biomarker.vnames)] %>%
+  gather(key = bio.marker, value = bio.value, crp.imp:tnfr1.imp) %>%
+  filter(!is.na(bio.value)) %>%
+  arrange(id, study.day) %>%
+  group_by(id, bio.marker) %>%
+  summarise(pt.n = sum(!is.na(bio.value)),
+            pt.mean = mean(bio.value, na.rm = TRUE),
+            pt.min = min(bio.value, na.rm = TRUE),
+            pt.max = max(bio.value, na.rm = TRUE),
+            pt.first = head(bio.value, n = 1),
+            pt.last = tail(bio.value, n = 1),
+            pt.auc = trapz(x = study.day, y = bio.value))
+bio.summary.pt$pt.delta <- with(bio.summary.pt, ifelse(pt.n == 1, NA, pt.last - pt.first))
+
+## Transpose for one variable per summary measure per marker
+bio.summary.wide <- bio.summary.pt %>%
+  gather(key = 'measure', value = 'quantity', pt.n:pt.delta) %>%
+  mutate(bio.vname = paste(gsub('\\.imp$', '', bio.marker),
+                           gsub('^pt\\.', '', measure),
+                           sep = '.')) %>%
+  select(-bio.marker, -measure) %>%
+  spread(key = bio.vname, value = quantity)
+
+## -- Calculate inverse probability weights for each survivor: --------------------------------------
+## 1. Logistic regression, using "in cohort" as outcome
+## 2. Get estimated probability for each person in cohort
+## 3. Weight = 1 / estimated probability
+
+## Subset data to remove observations with missing values; makes merging easier
+use.for.weights <- all.oneobs %>%
+  left_join(bio.summary.wide[,c('id', gsub('\\.imp$', '\\.mean', biomarker.vnames))], by = 'id') %>%
+  filter(!is.na(age.enroll) & !is.na(charlson.score) & !is.na(edu) & !is.na(iqcode.score.e) &
+           !is.na(stroke.risk) & !is.na(mean.benz.cube) & !is.na(mean.op.cube) &
+           !is.na(mean.prop.cube) & !is.na(mean.dex.cube) & !is.na(mean.hal.cube) &
+           !is.na(icudays.sevseptic.s) & !is.na(del.s.imp) & !is.na(coma.s.imp) &
+           !is.na(mean.modsofa.icu) & !is.na(cog.cohort.3 ) & !is.na(cog.cohort.12) &
+           !is.na(func.cohort.3) & !is.na(func.cohort.12) & !is.na(crp.mean) &
+           !is.na(ifngamma.mean) & !is.na(il10.mean) & !is.na(il12.mean) & !is.na(il1b.mean) &
+           !is.na(il6.mean) & !is.na(il8.mean) & !is.na(mmp9.mean) & !is.na(proteinc.mean) &
+           !is.na(tnfa.mean) & !is.na(tnfr1.mean))
+
+## Function to fit "in cohort ~ covariates" model for each cohort ##
+prob.cohort <- function(cohort.var){
+  fitted(glm(as.formula(paste(cohort.var,
+                              "rcs(age.enroll, 3) + rcs(charlson.score, 3) + edu +
+                               iqcode.score.e + rcs(stroke.risk, 3) +
+                               rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) +
+                               rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube +
+                               rcs(icudays.sevseptic.s, 3) + rcs(del.s.imp, 3) +
+                               rcs(coma.s.imp, 3) + rcs(mean.modsofa.icu, 3) +
+                               rcs(crp.mean, 3) + rcs(ifngamma.mean, 3) +
+                               rcs(il10.mean, 3) + rcs(il12.mean, 3) + rcs(il1b.mean, 3) +
+                               rcs(il6.mean, 3) + rcs(il8.mean) + rcs(mmp9.mean, 3) +
+                               rcs(proteinc.mean, 3) + rcs(tnfa.mean, 3) + rcs(tnfr1.mean, 3)",
+                              sep = ' ~ ')),
+             family = 'binomial',
+             data = use.for.weights))
+}
+
+use.for.weights$prob.cog.3 <- prob.cohort('cog.cohort.3')
+use.for.weights$prob.cog.12 <- prob.cohort('cog.cohort.12')
+use.for.weights$prob.func.3 <- prob.cohort('func.cohort.3')
+use.for.weights$prob.func.12 <- prob.cohort('func.cohort.12')
+use.for.weights$wt.cog.3 <- 1 / use.for.weights$prob.cog.3
+use.for.weights$wt.cog.12 <- 1 / use.for.weights$prob.cog.12
+use.for.weights$wt.func.3 <- 1 / use.for.weights$prob.func.3
+use.for.weights$wt.func.12 <- 1 / use.for.weights$prob.func.12
+
+## Checks for weights
+# sum(subset(use.for.weights, cog.cohort.3)$wt.cog.3)
+# sum(subset(use.for.weights, cog.cohort.12)$wt.cog.12)
+# sum(subset(use.for.weights, func.cohort.3)$wt.func.3)
+# sum(subset(use.for.weights, func.cohort.12)$wt.func.12)
+
+# sum(round(subset(use.for.weights, cog.cohort.3)$wt.cog.3, 1))
+# sum(round(subset(use.for.weights, cog.cohort.12)$wt.cog.12, 1))
+# sum(round(subset(use.for.weights, func.cohort.3)$wt.func.3, 1))
+# sum(round(subset(use.for.weights, func.cohort.12)$wt.func.12, 1))
+# 
+# ## Check using plots
+# ggplot(aes(x = cog.cohort.12, y = prob.cog.12), data = use.for.weights) + geom_boxplot() + scale_y_continuous(limits = 0:1)
+
+## -- Create data set with all covariates, test scores, weights ------------------------------------
+## Transpose followup scores
+model.fu.data <- all.fu %>%
+  filter(fu.period %in% c('3 Month', '12 Month')) %>%
+  select(id, fu.period, rbans.global.score, trail.b.tscore, adl.totscore, faq.totscore) %>%
+  separate(fu.period, into = c('month', 'text'), sep = ' ') %>%
+  gather(key = 'test', value = 'score', rbans.global.score:faq.totscore) %>%
+  mutate(test.month = paste(test, month, sep = '.')) %>%
+  select(-month, -text, -test) %>%
+  spread(key = test.month, value = score)
+
+## Create single data set
+model.data <- subset(all.oneobs,
+                     select = c(id, age.enroll, charlson.score, edu, iqcode.score.e, stroke.risk,
+                                mean.benz.cube, mean.op.cube, mean.prop.cube, mean.dex.cube,
+                                mean.hal.cube, adl.e, faq.e, frailty, cog.cohort.3,
+                                cog.cohort.12, func.cohort.3, func.cohort.12)) %>%
+  left_join(select(use.for.weights, id, wt.cog.3, wt.cog.12, wt.func.3, wt.func.12), by = 'id') %>%
+  left_join(bio.summary.wide, by = 'id') %>%
+  left_join(model.fu.data, by = 'id')
+
+## Add variable labels for tables
+label(model.data$cog.cohort.3) <- 'In cognitive analysis cohort, 3m'
+label(model.data$cog.cohort.12) <- 'In cognitive analysis cohort, 12m'
+label(model.data$func.cohort.3) <- 'In functional analysis cohort, 3m'
+label(model.data$func.cohort.12) <- 'In functional analysis cohort, 12m'
+label(model.data$wt.cog.3) <- 'Model weight, cognitive cohort, 3m'
+label(model.data$wt.cog.12) <- 'Model weight, cognitive cohort, 12m'
+label(model.data$wt.func.3) <- 'Model weight, functional cohort, 3m'
+label(model.data$wt.func.12) <- 'Model weight, functional cohort, 12m'
+label(model.data$adl.totscore.3) <- 'ADL score, 3m'
+label(model.data$adl.totscore.12) <- 'ADL score, 12m'
+label(model.data$faq.totscore.3) <- 'FAQ score, 3m'
+label(model.data$faq.totscore.12) <- 'FAQ score, 12m'
+label(model.data$rbans.global.score.3) <- 'RBANS global score, 3m'
+label(model.data$rbans.global.score.12) <- 'RBANS global score, 12m'
+label(model.data$trail.b.tscore.3) <- 'Trails B T-score, 3m'
+label(model.data$trail.b.tscore.12) <- 'Trails B T-score, 12m'
+
+@
+
+<<weighthist, results='asis', fig.cap='Histogram of Model Weights by Analysis Cohort', fig.align='center', fig.pos='!h', fig.width=5, fig.height=5>>=
+## -- Create histograms for inverse probability weights, showing total N in each cohort ------------
+## Data frame including variable names and axis labels to use in histograms
+cohort.df <-
+  data.frame(cohort.var = c('cog.cohort.3', 'cog.cohort.12', 'func.cohort.3', 'func.cohort.12'),
+             wt.var = c('wt.cog.3', 'wt.cog.12', 'wt.func.3', 'wt.func.12'),
+             xaxis.title = c('Cognitive Cohort, 3m', 'Cognitive Cohort, 12m',
+                             'Functional Cohort, 3m', 'Functional Cohort, 12m'))
+
+## Function to create histogram for a given cohort, weight variable and X axis label
+create.wthist <- function(rownum){
+  ## Get data needed, replace variable names with generics
+  usedata <- model.data[,c(as.character(cohort.df$cohort.var[rownum]),
+                           as.character(cohort.df$wt.var[rownum]))]
+  names(usedata) <- c('cohort.var', 'wt.var')
+  
+  ## Create histogram
+  ggplot(aes(x = wt.var), data = subset(usedata, cohort.var)) +
+    geom_histogram(colour = NA, fill = 'navy', alpha = 0.8) +
+    ## Add N to X axis label
+    scale_x_continuous(limits = c(0, 12),
+                       name = paste0(cohort.df$xaxis.title[rownum], '\nN = ',
+                                     sum(usedata$cohort.var, na.rm = TRUE))) +
+    scale_y_continuous(limits = c(0, 200), name = '') +
+    theme_minimal() +
+    theme(axis.text = element_text(colour = 'grey30', size = 7),
+          axis.ticks = element_blank(),
+          axis.title = element_text(size = 8))
+}
+
+## Create plot for each cohort, then plot in 2x2 matrix
+wthist.list <- lapply(1:nrow(cohort.df), FUN = create.wthist)
+multiplot(plotlist = wthist.list, layout = matrix(1:4, ncol = 2, byrow = TRUE))
+@
+
+\end{document}
