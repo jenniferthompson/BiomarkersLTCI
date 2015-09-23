@@ -28,6 +28,20 @@ library(tidyr)
 
 @
 
+<<fxnsetup>>=
+## -- Function to print model diagnostics ----------------------------------------------------------
+ols.diagnostics <- function(model.obj, outcome.string, title.string){
+  par(mfrow = c(1, 2), cex = 0.8, cex.main = 0.9)
+  plot(resid(model.obj) ~ fitted(model.obj),
+       xlab = paste('Predicted', outcome.string), 
+       ylab = paste('Model residual'),
+       main = paste('RP plot,', title.string),
+       col = 'turquoise4')
+  abline(h = 0)
+  qqnorm(resid(model.obj), datax = TRUE, main = paste('Q-Q of residuals,', title.string))
+}
+@
+
 <<loaddata>>=
 ## Create vector of variable names of each biomarker
 biomarker.vnames <- paste0(c('crp', 'ifngamma', 'il10', 'il12', 'il1b', 'il6', 'il8', 'mmp9',
@@ -128,10 +142,12 @@ bio.summary.pt <- all.daily[,c('id', 'study.day', biomarker.vnames)] %>%
             pt.last = tail(bio.value, n = 1),
             pt.auc = trapz(x = study.day, y = bio.value))
 bio.summary.pt$pt.delta <- with(bio.summary.pt, ifelse(pt.n == 1, NA, pt.last - pt.first))
+bio.summary.pt$pt.pctchg <-
+  with(bio.summary.pt, ifelse(pt.n == 1, NA, ((pt.last - pt.first) / pt.first)))
 
 ## Transpose for one variable per summary measure per marker
 bio.summary.wide <- bio.summary.pt %>%
-  gather(key = 'measure', value = 'quantity', pt.n:pt.delta) %>%
+  gather(key = 'measure', value = 'quantity', pt.n:pt.pctchg) %>%
   mutate(bio.vname = paste(gsub('\\.imp$', '', bio.marker),
                            gsub('^pt\\.', '', measure),
                            sep = '.')) %>%
@@ -139,63 +155,72 @@ bio.summary.wide <- bio.summary.pt %>%
   spread(key = bio.vname, value = quantity)
 
 ## -- Calculate inverse probability weights for each survivor: --------------------------------------
-## 1. Logistic regression, using "in cohort" as outcome
-## 2. Get estimated probability for each person in cohort
-## 3. Weight = 1 / estimated probability
+## 1. Create aregImpute object to handle missing covariate data
+## 2. Logistic regression, using "in cohort" as outcome
+## 3. Get estimated probability for each person in cohort
+## 4. Weight = 1 / estimated probability
 
-## Subset data to remove observations with missing values; makes merging easier
-use.for.weights <- all.oneobs %>%
-  left_join(bio.summary.wide[,c('id', gsub('\\.imp$', '\\.mean', biomarker.vnames))], by = 'id') %>%
-  filter(!is.na(age.enroll) & !is.na(charlson.score) & !is.na(edu) & !is.na(iqcode.score.e) &
-           !is.na(stroke.risk) & !is.na(mean.benz.cube) & !is.na(mean.op.cube) &
-           !is.na(mean.prop.cube) & !is.na(mean.dex.cube) & !is.na(mean.hal.cube) &
-           !is.na(icudays.sevseptic.s) & !is.na(del.s.imp) & !is.na(coma.s.imp) &
-           !is.na(mean.modsofa.icu) & !is.na(cog.cohort.3 ) & !is.na(cog.cohort.12) &
-           !is.na(func.cohort.3) & !is.na(func.cohort.12) & !is.na(crp.mean) &
-           !is.na(ifngamma.mean) & !is.na(il10.mean) & !is.na(il12.mean) & !is.na(il1b.mean) &
-           !is.na(il6.mean) & !is.na(il8.mean) & !is.na(mmp9.mean) & !is.na(proteinc.mean) &
-           !is.na(tnfa.mean) & !is.na(tnfr1.mean))
+## Create data set for imputation and modeling data
+model.data <- subset(all.oneobs,
+                     select = c(id, age.enroll, charlson.score, edu, iqcode.score.e, stroke.risk,
+                                mean.benz.cube, mean.op.cube, mean.prop.cube, mean.dex.cube,
+                                mean.hal.cube, adl.e, faq.e, frailty, icudays.sevseptic.s,
+                                mean.modsofa.icu, del.s.imp, coma.s.imp, vent.los.tot.s,
+                                cog.cohort.3, cog.cohort.12, func.cohort.3, func.cohort.12)) %>%
+  left_join(bio.summary.wide, by = 'id')
+dd <- datadist(model.data); options(datadist = 'dd')
 
-## Function to fit "in cohort ~ covariates" model for each cohort ##
+## Create aregImpute object to use in weighting model
+set.seed(1)
+areg.weight <- aregImpute(~ age.enroll + charlson.score + I(edu) + I(iqcode.score.e) + stroke.risk +
+                            mean.benz.cube + mean.op.cube + mean.prop.cube + I(mean.dex.cube) +
+                            I(mean.hal.cube) + icudays.sevseptic.s + del.s.imp + coma.s.imp +
+                            mean.modsofa.icu + crp.mean + ifngamma.mean + il10.mean + il12.mean +
+                            il1b.mean + il6.mean + il8.mean + mmp9.mean + proteinc.mean + tnfa.mean +
+                            tnfr1.mean,
+                          n.impute = 10,
+                          nk = 3,
+                          data = model.data)
+
+## Function to model P(being in cohort) using imputation
 prob.cohort <- function(cohort.var){
-  fitted(glm(as.formula(paste(cohort.var,
-                              "rcs(age.enroll, 3) + rcs(charlson.score, 3) + edu +
-                               iqcode.score.e + rcs(stroke.risk, 3) +
-                               rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) +
-                               rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube +
-                               rcs(icudays.sevseptic.s, 3) + rcs(del.s.imp, 3) +
-                               rcs(coma.s.imp, 3) + rcs(mean.modsofa.icu, 3) +
-                               rcs(crp.mean, 3) + rcs(ifngamma.mean, 3) +
-                               rcs(il10.mean, 3) + rcs(il12.mean, 3) + rcs(il1b.mean, 3) +
-                               rcs(il6.mean, 3) + rcs(il8.mean) + rcs(mmp9.mean, 3) +
-                               rcs(proteinc.mean, 3) + rcs(tnfa.mean, 3) + rcs(tnfr1.mean, 3)",
-                              sep = ' ~ ')),
-             family = 'binomial',
-             data = use.for.weights))
+  wtmod <- fit.mult.impute(formula = as.formula(paste(cohort.var,
+                             "rcs(age.enroll, 3) + rcs(charlson.score, 3) + edu +
+                              iqcode.score.e + rcs(stroke.risk, 3) +
+                              rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) +
+                              rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube +
+                              rcs(icudays.sevseptic.s, 3) + rcs(del.s.imp, 3) +
+                              rcs(coma.s.imp, 3) + rcs(mean.modsofa.icu, 3) +
+                              rcs(crp.mean, 3) + rcs(ifngamma.mean, 3) +
+                              rcs(il10.mean, 3) + rcs(il12.mean, 3) + rcs(il1b.mean, 3) +
+                              rcs(il6.mean, 3) + il8.mean + rcs(mmp9.mean, 3) +
+                              rcs(proteinc.mean, 3) + rcs(tnfa.mean, 3) + rcs(tnfr1.mean, 3)",
+                            sep = ' ~ ')),
+                            fitter = lrm,
+                            xtrans = areg.weight,
+                            data = model.data)
+  predict(wtmod, type = 'fitted')
 }
 
-use.for.weights$prob.cog.3 <- prob.cohort('cog.cohort.3')
-use.for.weights$prob.cog.12 <- prob.cohort('cog.cohort.12')
-use.for.weights$prob.func.3 <- prob.cohort('func.cohort.3')
-use.for.weights$prob.func.12 <- prob.cohort('func.cohort.12')
-use.for.weights$wt.cog.3 <- 1 / use.for.weights$prob.cog.3
-use.for.weights$wt.cog.12 <- 1 / use.for.weights$prob.cog.12
-use.for.weights$wt.func.3 <- 1 / use.for.weights$prob.func.3
-use.for.weights$wt.func.12 <- 1 / use.for.weights$prob.func.12
+prob.cog.3 <- prob.cohort('cog.cohort.3')
+prob.cog.12 <- prob.cohort('cog.cohort.12')
+prob.func.3 <- prob.cohort('func.cohort.3')
+prob.func.12 <- prob.cohort('func.cohort.12')
 
-## Checks for weights
-# sum(subset(use.for.weights, cog.cohort.3)$wt.cog.3)
-# sum(subset(use.for.weights, cog.cohort.12)$wt.cog.12)
-# sum(subset(use.for.weights, func.cohort.3)$wt.func.3)
-# sum(subset(use.for.weights, func.cohort.12)$wt.func.12)
+## Final weights = inverse of P(being in cohort)
+model.data$wt.cog.3 <- 1 / prob.cog.3
+model.data$wt.cog.12 <- 1 / prob.cog.12
+model.data$wt.func.3 <- 1 / prob.func.3
+model.data$wt.func.12 <- 1 / prob.func.12
 
-# sum(round(subset(use.for.weights, cog.cohort.3)$wt.cog.3, 1))
-# sum(round(subset(use.for.weights, cog.cohort.12)$wt.cog.12, 1))
-# sum(round(subset(use.for.weights, func.cohort.3)$wt.func.3, 1))
-# sum(round(subset(use.for.weights, func.cohort.12)$wt.func.12, 1))
-# 
+# ## Checks for weights
+# sum(subset(model.data, cog.cohort.3)$wt.cog.3)
+# sum(subset(model.data, cog.cohort.12)$wt.cog.12)
+# sum(subset(model.data, func.cohort.3)$wt.func.3)
+# sum(subset(model.data, func.cohort.12)$wt.func.12)
+
 # ## Check using plots
-# ggplot(aes(x = cog.cohort.12, y = prob.cog.12), data = use.for.weights) + geom_boxplot() + scale_y_continuous(limits = 0:1)
+# ggplot(aes(x = cog.cohort.12, y = prob.cog.12), data = model.data) + geom_boxplot() + scale_y_continuous(limits = 0:1)
 
 ## -- Create data set with all covariates, test scores, weights ------------------------------------
 ## Transpose followup scores
@@ -209,13 +234,7 @@ model.fu.data <- all.fu %>%
   spread(key = test.month, value = score)
 
 ## Create single data set
-model.data <- subset(all.oneobs,
-                     select = c(id, age.enroll, charlson.score, edu, iqcode.score.e, stroke.risk,
-                                mean.benz.cube, mean.op.cube, mean.prop.cube, mean.dex.cube,
-                                mean.hal.cube, adl.e, faq.e, frailty, cog.cohort.3,
-                                cog.cohort.12, func.cohort.3, func.cohort.12)) %>%
-  left_join(select(use.for.weights, id, wt.cog.3, wt.cog.12, wt.func.3, wt.func.12), by = 'id') %>%
-  left_join(bio.summary.wide, by = 'id') %>%
+model.data <- model.data %>%
   left_join(model.fu.data, by = 'id')
 
 ## Add variable labels for tables
@@ -261,7 +280,7 @@ create.wthist <- function(rownum){
     scale_x_continuous(limits = c(0, 12),
                        name = paste0(cohort.df$xaxis.title[rownum], '\nN = ',
                                      sum(usedata$cohort.var, na.rm = TRUE))) +
-    scale_y_continuous(limits = c(0, 200), name = '') +
+    scale_y_continuous(limits = c(0, 225), name = '') +
     theme_minimal() +
     theme(axis.text = element_text(colour = 'grey30', size = 7),
           axis.ticks = element_blank(),
