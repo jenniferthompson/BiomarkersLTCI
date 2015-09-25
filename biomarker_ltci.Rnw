@@ -817,6 +817,55 @@ latex.results <- function(resultsdata, markerstr, teststr){
         label = paste0('table:', tolower(markerstr), tolower(teststr)),
         caption = paste(markerstr, 'vs', teststr))
 }
+
+# ## Spot check a few models
+# test1.nowt <- fit.mult.impute(as.formula(paste('rbans.global.score.3 ~',
+#                                                gsub('markervar', 'tnfa.first', covar.cog,
+#                                                     fixed = TRUE))),
+#                               fitter = ols,
+#                               xtrans = areg.cog.first.3,
+#                               data = model.data.cog.3)
+# anova(test1.nowt)
+# anova(tnfa.mods$first.rbans.nowt.3)
+# summary(test1.nowt)
+# summary(tnfa.mods$first.rbans.nowt.3)
+#
+# test1.wt <- fit.mult.impute(as.formula(paste('rbans.global.score.3 ~',
+#                                              gsub('markervar', 'tnfa.first', covar.cog,
+#                                                   fixed = TRUE))),
+#                             fitter = ols.fix,
+#                             xtrans = areg.cog.first.3,
+#                             weights = wt.cog.3,
+#                             data = model.data.cog.3)
+# anova(test1.wt)
+# anova(tnfa.mods$first.rbans.wt.3)
+# summary(test1.wt)
+# summary(tnfa.mods$first.rbans.wt.3)
+#
+# ## Spot check a few models
+# test2.nowt <- fit.mult.impute(as.formula(paste('trail.b.tscore.12 ~',
+#                                                gsub('markervar', 'il10.pctchg', covar.cog,
+#                                                     fixed = TRUE))),
+#                               fitter = ols,
+#                               xtrans = areg.cog.pctchg.12,
+#                               data = model.data.cog.12)
+# anova(test2.nowt)
+# anova(il10.mods$pctchg.trailb.nowt.12)
+# summary(test2.nowt)
+# summary(il10.mods$pctchg.trailb.nowt.12)
+#
+# test2.wt <- fit.mult.impute(as.formula(paste('trail.b.tscore.12 ~',
+#                                              gsub('markervar', 'il10.pctchg', covar.cog,
+#                                                   fixed = TRUE))),
+#                             fitter = ols.fix,
+#                             xtrans = areg.cog.pctchg.12,
+#                             weights = wt.cog.12,
+#                             data = model.data.cog.12)
+# anova(test2.wt)
+# anova(il10.mods$pctchg.trailb.wt.12)
+# summary(test2.wt)
+# summary(il10.mods$pctchg.trailb.wt.12)
+
 @
 
 \section{Biomarkers vs. LTCI Outcomes}
