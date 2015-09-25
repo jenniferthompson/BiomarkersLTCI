@@ -866,6 +866,66 @@ latex.results <- function(resultsdata, markerstr, teststr){
 # summary(test2.wt)
 # summary(il10.mods$pctchg.trailb.wt.12)
 
+## Function to plot results from a model, weighted and non-weighted on the same panel
+test.ylabs <- data.frame(testvar = c('rbans', 'trailb', 'adl', 'faq'),
+                         testylab = c('Adjusted RBANS Global Score',
+                                      'Adjusted Trails B T-Score',
+                                      'Adjusted Prob. of Higher ADL Score',
+                                      'Adjusted Prob. of Higher FAQ Score'))
+
+plot.test.results <- function(modlist, ## List of model objects (eg, crp.mods)
+                              test = c('rbans', 'trailb', 'adl', 'faq'), ## Test of interest
+                              marker){ ## String; biomarker prefix (eg, 'crp')
+
+  ## For all models in modlist which involve test of interest, get predicted values;
+  ##  bind all predicted values in single data set, adding model name (eg,
+  ##  mean.rbans.nowt.3) as variable
+  pred.data <- bind_rows(lapply(grep(test, names(modlist)), FUN = function(x){
+
+    markervar <- grep(marker, names(coef(modlist[[x]])), value = TRUE)[1]
+
+    ## If model is looking at ADL or FAQ (POLR model), need predictions on probability scale
+    if(test %in% c('adl', 'faq')){
+      pred.eval <-
+        paste('as.data.frame(Predict(modlist[[x]],', markervar, '= NA, fun = plogis))')
+    } else{
+      pred.eval <- paste('as.data.frame(Predict(modlist[[x]],', markervar, '= NA))')
+    }
+    tmp <- eval(parse(text = pred.eval))
+    names(tmp) <- gsub(markervar, 'markervar', names(tmp))
+    tmp$modtype <- names(modlist)[x]
+    tmp
+  })) %>%
+    ## Separate model name variable into pieces and use to create factors for plotting
+    separate(modtype, into = c('measure', 'test', 'weight', 'time')) %>%
+    mutate(measurestr = factor(ifelse(measure == 'mean', 1,
+                               ifelse(measure == 'first', 2, 3)),
+                               levels = 1:3, labels = c('Mean', 'First', '% Change')),
+           timestr = factor(ifelse(time == 3, 1, 2),
+                            levels = 1:2, labels = c('3 Months', '12 Months')))
+
+  ## Plot, with biomarker measures as columns and time points as rows
+  marker.plot <- ggplot(aes(x = markervar), data = pred.data) +
+    facet_grid(timestr ~ measurestr, scales = 'free_x') +
+    geom_ribbon(aes(ymin = lower, ymax = upper, fill = weight), alpha = 0.4) +
+    geom_line(aes(y = yhat, colour = weight)) +
+    scale_colour_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
+    scale_fill_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
+    xlab(paste('Measure of', toupper(marker))) +
+    ylab(test.ylabs[match(test, test.ylabs$testvar), 'testylab']) +
+    theme_bw() +
+    theme(legend.position = 'bottom',
+          legend.key.size = unit(0.5, "cm"),
+          legend.text = element_text(size = 8),
+          axis.ticks = element_line(colour = 'grey50'),
+          axis.text = element_text(size = 8),
+          axis.title.x = element_text(vjust = 0),
+          strip.background = element_blank(),
+          panel.margin = unit(0.5, 'lines'))
+
+  return(marker.plot)
+}
+
 @
 
 \section{Biomarkers vs. LTCI Outcomes}
@@ -893,68 +953,133 @@ propofol, dexmedetomidine, and haloperidol in the ICU
 
 \begin{landscape}
 \subsection{CRP}
-<<printcrplinearresults, results='asis'>>=
+<<printcrprbansresults, results='asis', fig.cap = 'CRP vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = crp.mods, test = 'rbans', marker = 'crp'))
 latex.results(crp.rbans.results, 'CRP', 'RBANS Global Scores')
+@
+\clearpage
+<<printcrptrailbresults, results='asis', fig.cap = 'CRP vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = crp.mods, test = 'trailb', marker = 'crp'))
 latex.results(crp.trailb.results, 'CRP', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{IFN-$\gamma$}
-<<printifngammalinearresults, results='asis'>>=
+<<printifngammarbansresults, results='asis', fig.cap = 'IFN-gamma vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = ifngamma.mods, test = 'rbans', marker = 'ifngamma'))
 latex.results(ifngamma.rbans.results, 'IFN-gamma', 'RBANS Global Scores')
+@
+\clearpage
+<<printifngammatrailbresults, results='asis', fig.cap = 'IFN-gamma vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = ifngamma.mods, test = 'trailb', marker = 'ifngamma'))
 latex.results(ifngamma.trailb.results, 'IFN-gamma', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{IL-10}
-<<printil10linearresults, results='asis'>>=
+<<printil10rbansresults, results='asis', fig.cap = 'IL-10 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il10.mods, test = 'rbans', marker = 'il10'))
 latex.results(il10.rbans.results, 'IL-10', 'RBANS Global Scores')
+@
+\clearpage
+<<printil10trailbresults, results='asis', fig.cap = 'IL-10 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il10.mods, test = 'trailb', marker = 'il10'))
 latex.results(il10.trailb.results, 'IL-10', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{IL-12}
-<<printil12linearresults, results='asis'>>=
+<<printil12rbansresults, results='asis', fig.cap = 'IL-12 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il12.mods, test = 'rbans', marker = 'il12'))
 latex.results(il12.rbans.results, 'IL-12', 'RBANS Global Scores')
+@
+\clearpage
+<<printil12trailbresults, results='asis', fig.cap = 'IL-12 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il12.mods, test = 'trailb', marker = 'il12'))
 latex.results(il12.trailb.results, 'IL-12', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{IL-1$\beta$}
-<<printil1blinearresults, results='asis'>>=
+<<printil1brbansresults, results='asis', fig.cap = 'IL-1b vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il1b.mods, test = 'rbans', marker = 'il1b'))
 latex.results(il1b.rbans.results, 'IL-1b', 'RBANS Global Scores')
+@
+\clearpage
+<<printil1btrailbresults, results='asis', fig.cap = 'IL-1b vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il1b.mods, test = 'trailb', marker = 'il1b'))
 latex.results(il1b.trailb.results, 'IL-1b', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{IL-6}
-<<printil6linearresults, results='asis'>>=
+<<printil6rbansresults, results='asis', fig.cap = 'IL-6 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il6.mods, test = 'rbans', marker = 'il6'))
 latex.results(il6.rbans.results, 'IL-6', 'RBANS Global Scores')
+@
+\clearpage
+<<printil6trailbresults, results='asis', fig.cap = 'IL-6 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il6.mods, test = 'trailb', marker = 'il6'))
 latex.results(il6.trailb.results, 'IL-6', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{IL-8}
-<<printil8linearresults, results='asis'>>=
+<<printil8rbansresults, results='asis', fig.cap = 'IL-8 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il8.mods, test = 'rbans', marker = 'il8'))
 latex.results(il8.rbans.results, 'IL-8', 'RBANS Global Scores')
+@
+\clearpage
+<<printil8trailbresults, results='asis', fig.cap = 'IL-8 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = il8.mods, test = 'trailb', marker = 'il8'))
 latex.results(il8.trailb.results, 'IL-8', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{MMP9}
-<<printmmp9linearresults, results='asis'>>=
+<<printmmp9rbansresults, results='asis', fig.cap = 'MMP9 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = mmp9.mods, test = 'rbans', marker = 'mmp9'))
 latex.results(mmp9.rbans.results, 'MMP9', 'RBANS Global Scores')
+@
+\clearpage
+<<printmmp9trailbresults, results='asis', fig.cap = 'MMP9 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = mmp9.mods, test = 'trailb', marker = 'mmp9'))
 latex.results(mmp9.trailb.results, 'MMP9', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{Protein C}
-<<printproteinclinearresults, results='asis'>>=
+<<printproteincrbansresults, results='asis', fig.cap = 'Protein C vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = proteinc.mods, test = 'rbans', marker = 'proteinc'))
 latex.results(proteinc.rbans.results, 'Protein C', 'RBANS Global Scores')
+@
+\clearpage
+<<printproteinctrailbresults, results='asis', fig.cap = 'Protein C vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = proteinc.mods, test = 'trailb', marker = 'proteinc'))
 latex.results(proteinc.trailb.results, 'Protein C', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{TNF$\alpha$}
-<<printtnfalinearresults, results='asis'>>=
+<<printtnfarbansresults, results='asis', fig.cap = 'TNF-alpha vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = tnfa.mods, test = 'rbans', marker = 'tnfa'))
 latex.results(tnfa.rbans.results, 'TNF-alpha', 'RBANS Global Scores')
+@
+\clearpage
+<<printtnfatrailbresults, results='asis', fig.cap = 'TNF-alpha vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = tnfa.mods, test = 'trailb', marker = 'tnfa'))
 latex.results(tnfa.trailb.results, 'TNF-alpha', 'Trails B T-Scores')
 @
 
+\clearpage
 \subsection{TNFR1}
-<<printtnfr1linearresults, results='asis'>>=
+<<printtnfr1rbansresults, results='asis', fig.cap = 'TNFR1 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = tnfr1.mods, test = 'rbans', marker = 'tnfr1'))
 latex.results(tnfr1.rbans.results, 'TNFR1', 'RBANS Global Scores')
+@
+\clearpage
+<<printtnfr1trailbresults, results='asis', fig.cap = 'TNFR1 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = tnfr1.mods, test = 'trailb', marker = 'tnfr1'))
 latex.results(tnfr1.trailb.results, 'TNFR1', 'Trails B T-Scores')
 @
 
