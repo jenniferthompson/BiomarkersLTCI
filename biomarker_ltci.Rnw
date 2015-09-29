@@ -32,14 +32,25 @@ library(tidyr)
 <<fxnsetup>>=
 ## -- Function to print model diagnostics ----------------------------------------------------------
 ols.diagnostics <- function(model.obj, outcome.string, title.string){
-#   par(mfrow = c(1, 2), cex = 0.8, cex.main = 0.9)
-  plot(resid(model.obj) ~ fitted(model.obj),
-       xlab = paste('Predicted', outcome.string),
-       ylab = paste('Model residual'),
-       main = paste('RP plot,', title.string),
-       col = 'turquoise4')
-  abline(h = 0)
-  qqnorm(resid(model.obj), datax = TRUE, main = paste('Q-Q of residuals,', title.string))
+  ## fit.mult.impute objects work differently than non-imputed objects; use residuals and fitted
+  ##  values from model object directly rather than resid() and fitted()
+  if('fit.mult.impute' %in% class(model.obj)){
+    plot(model.obj$residuals ~ model.obj$fitted.values,
+         xlab = paste('Predicted', outcome.string),
+         ylab = paste('Model residual'),
+         main = paste('RP plot,', title.string),
+         col = 'turquoise4')
+    abline(h = 0)
+    qqnorm(model.obj$residuals, datax = TRUE, main = paste('Q-Q of residuals,', title.string))
+  } else{
+    plot(resid(model.obj) ~ fitted(model.obj),
+         xlab = paste('Predicted', outcome.string),
+         ylab = paste('Model residual'),
+         main = paste('RP plot,', title.string),
+         col = 'turquoise4')
+    abline(h = 0)
+    qqnorm(resid(model.obj), datax = TRUE, main = paste('Q-Q of residuals,', title.string))
+  }
 }
 
 ## Create "fixed" versions of ols() and lrm() to work around bug wih weights argument (thanks, Cole!)
@@ -157,7 +168,7 @@ bio.summary.wide <- bio.summary.pt %>%
   mutate(bio.vname = paste(gsub('\\.imp$', '', bio.marker),
                            gsub('^pt\\.', '', measure),
                            sep = '.')) %>%
-  select(-bio.marker, -measure) %>%
+  dplyr::select(-bio.marker, -measure) %>%
   spread(key = bio.vname, value = quantity)
 
 ## -- Calculate inverse probability weights for each survivor: --------------------------------------
@@ -232,11 +243,11 @@ model.data$wt.func.12 <- 1 / prob.func.12
 ## Transpose followup scores
 model.fu.data <- all.fu %>%
   filter(fu.period %in% c('3 Month', '12 Month')) %>%
-  select(id, fu.period, rbans.global.score, trail.b.tscore, adl.totscore, faq.totscore) %>%
+  dplyr::select(id, fu.period, rbans.global.score, trail.b.tscore, adl.totscore, faq.totscore) %>%
   separate(fu.period, into = c('month', 'text'), sep = ' ') %>%
   gather(key = 'test', value = 'score', rbans.global.score:faq.totscore) %>%
   mutate(test.month = paste(test, month, sep = '.')) %>%
-  select(-month, -text, -test) %>%
+  dplyr::select(-month, -text, -test) %>%
   spread(key = test.month, value = score)
 
 ## Create single data set
@@ -358,11 +369,30 @@ make.modform <- function(outcome, markervar, covarstring = c('covar.cog', 'covar
 }
 
 ## -- Function to run all models for a given biomarker ---------------------------------------------
-run.marker.mods <- function(marker){
+## marker: string representing prefix for biomarker variable (eg, "crp")
+## transmethod: method to transform biomarker variable, corresponding to function (eg, "log10")
+run.marker.mods <- function(marker, transmethod = NULL){
+  ## Create character string representing biomarker variable (+ transformation, if needed) to
+  ## include in model formulas
+  ## Currently, **no transformations** for % change - negative values create problems
+  if(is.null(transmethod)){
+    transmarker.mean <- paste0(marker, '.mean')
+    transmarker.first <- paste0(marker, '.first')
+    transmarker.pctchg <- paste0(marker, '.pctchg')
+  } else{
+    if(!exists(transmethod)){
+      stop(paste(transmethod, 'is not a recognized function in R.'))
+    } else{
+      transmarker.mean <- paste0(transmethod, '(', marker, '.mean)')
+      transmarker.first <- paste0(transmethod, '(', marker, '.first)')
+      transmarker.pctchg <- paste0(marker, '.pctchg')
+    }
+  }
+  
   ## RBANS global score ##
   ## Mean vs. RBANS
   mean.rbans3.form <-
-    as.formula(make.modform('rbans.global.score.3', paste0(marker, '.mean'), covar.cog))
+    as.formula(make.modform('rbans.global.score.3', transmarker.mean, covar.cog))
   mean.rbans.nowt.3 <-
     fit.mult.impute(mean.rbans3.form, fitter = ols, xtrans = areg.cog.mean.3, data = model.data.cog.3)
   mean.rbans.wt.3 <-
@@ -370,7 +400,7 @@ run.marker.mods <- function(marker){
                     data = model.data.cog.3)
 
   mean.rbans12.form <-
-    as.formula(make.modform('rbans.global.score.12', paste0(marker, '.mean'), covar.cog))
+    as.formula(make.modform('rbans.global.score.12', transmarker.mean, covar.cog))
   mean.rbans.nowt.12 <-
     fit.mult.impute(mean.rbans12.form, fitter = ols, xtrans = areg.cog.mean.12, data = model.data.cog.12)
   mean.rbans.wt.12 <-
@@ -379,7 +409,7 @@ run.marker.mods <- function(marker){
 
   ## First vs. RBANS
   first.rbans3.form <-
-    as.formula(make.modform('rbans.global.score.3', paste0(marker, '.first'), covar.cog))
+    as.formula(make.modform('rbans.global.score.3', transmarker.first, covar.cog))
   first.rbans.nowt.3 <-
     fit.mult.impute(first.rbans3.form, fitter = ols, xtrans = areg.cog.first.3, data = model.data.cog.3)
   first.rbans.wt.3 <-
@@ -387,7 +417,7 @@ run.marker.mods <- function(marker){
                     data = model.data.cog.3)
 
   first.rbans12.form <-
-    as.formula(make.modform('rbans.global.score.12', paste0(marker, '.first'), covar.cog))
+    as.formula(make.modform('rbans.global.score.12', transmarker.first, covar.cog))
   first.rbans.nowt.12 <-
     fit.mult.impute(first.rbans12.form, fitter = ols, xtrans = areg.cog.first.12,
                     data = model.data.cog.12)
@@ -397,7 +427,7 @@ run.marker.mods <- function(marker){
 
   ## % change vs. RBANS
   pctchg.rbans3.form <-
-    as.formula(make.modform('rbans.global.score.3', paste0(marker, '.pctchg'), covar.cog))
+    as.formula(make.modform('rbans.global.score.3', transmarker.pctchg, covar.cog))
   pctchg.rbans.nowt.3 <-
     fit.mult.impute(pctchg.rbans3.form, fitter = ols, xtrans = areg.cog.pctchg.3,
                     data = model.data.cog.3)
@@ -406,7 +436,7 @@ run.marker.mods <- function(marker){
                     weights = wt.cog.3, data = model.data.cog.3)
 
   pctchg.rbans12.form <-
-    as.formula(make.modform('rbans.global.score.12', paste0(marker, '.pctchg'), covar.cog))
+    as.formula(make.modform('rbans.global.score.12', transmarker.pctchg, covar.cog))
   pctchg.rbans.nowt.12 <-
     fit.mult.impute(pctchg.rbans12.form, fitter = ols, xtrans = areg.cog.pctchg.12,
                     data = model.data.cog.12)
@@ -417,7 +447,7 @@ run.marker.mods <- function(marker){
   ## Trails B T-score ##
   ## Mean vs. Trails B
   mean.trailb3.form <-
-    as.formula(make.modform('trail.b.tscore.3', paste0(marker, '.mean'), covar.cog))
+    as.formula(make.modform('trail.b.tscore.3', transmarker.mean, covar.cog))
   mean.trailb.nowt.3 <-
     fit.mult.impute(mean.trailb3.form, fitter = ols, xtrans = areg.cog.mean.3,
                     data = model.data.cog.3)
@@ -427,7 +457,7 @@ run.marker.mods <- function(marker){
                     data = model.data.cog.3)
 
   mean.trailb12.form <-
-    as.formula(make.modform('trail.b.tscore.12', paste0(marker, '.mean'), covar.cog))
+    as.formula(make.modform('trail.b.tscore.12', transmarker.mean, covar.cog))
   mean.trailb.nowt.12 <-
     fit.mult.impute(mean.trailb12.form, fitter = ols, xtrans = areg.cog.mean.12,
                     data = model.data.cog.12)
@@ -437,7 +467,7 @@ run.marker.mods <- function(marker){
 
   ## First vs. Trails B
   first.trailb3.form <-
-    as.formula(make.modform('trail.b.tscore.3', paste0(marker, '.first'), covar.cog))
+    as.formula(make.modform('trail.b.tscore.3', transmarker.first, covar.cog))
   first.trailb.nowt.3 <-
     fit.mult.impute(first.trailb3.form, fitter = ols, xtrans = areg.cog.first.3,
                     data = model.data.cog.3)
@@ -446,7 +476,7 @@ run.marker.mods <- function(marker){
                     weights = wt.cog.3, data = model.data.cog.3)
 
   first.trailb12.form <-
-    as.formula(make.modform('trail.b.tscore.12', paste0(marker, '.first'), covar.cog))
+    as.formula(make.modform('trail.b.tscore.12', transmarker.first, covar.cog))
   first.trailb.nowt.12 <-
     fit.mult.impute(first.trailb12.form, fitter = ols, xtrans = areg.cog.first.12,
                     data = model.data.cog.12)
@@ -456,7 +486,7 @@ run.marker.mods <- function(marker){
 
   ## % change vs. Trails B
   pctchg.trailb3.form <-
-    as.formula(make.modform('trail.b.tscore.3', paste0(marker, '.pctchg'), covar.cog))
+    as.formula(make.modform('trail.b.tscore.3', transmarker.pctchg, covar.cog))
   pctchg.trailb.nowt.3 <-
     fit.mult.impute(pctchg.trailb3.form, fitter = ols, xtrans = areg.cog.pctchg.3,
                     data = model.data.cog.3)
@@ -465,7 +495,7 @@ run.marker.mods <- function(marker){
                     weights = wt.cog.3, data = model.data.cog.3)
 
   pctchg.trailb12.form <-
-    as.formula(make.modform('trail.b.tscore.12', paste0(marker, '.pctchg'), covar.cog))
+    as.formula(make.modform('trail.b.tscore.12', transmarker.pctchg, covar.cog))
   pctchg.trailb.nowt.12 <-
     fit.mult.impute(pctchg.trailb12.form, fitter = ols, xtrans = areg.cog.pctchg.12,
                     data = model.data.cog.12)
@@ -615,17 +645,20 @@ run.marker.mods <- function(marker){
 #               'pctchg.faq.wt.12' = pctchg.faq.wt.12))
 }
 
-crp.mods <- run.marker.mods('crp')
-ifngamma.mods <- run.marker.mods('ifngamma')
-il10.mods <- run.marker.mods('il10')
-il12.mods <- run.marker.mods('il12')
-il1b.mods <- run.marker.mods('il1b')
-il6.mods <- run.marker.mods('il6')
-il8.mods <- run.marker.mods('il8')
-mmp9.mods <- run.marker.mods('mmp9')
-proteinc.mods <- run.marker.mods('proteinc')
-tnfa.mods <- run.marker.mods('tnfa')
-tnfr1.mods <- run.marker.mods('tnfr1')
+## Set character string variable for type of transformation
+transtype <- 'log10'
+
+crp.mods <- run.marker.mods('crp', transtype)
+ifngamma.mods <- run.marker.mods('ifngamma', transtype)
+il10.mods <- run.marker.mods('il10', transtype)
+il12.mods <- run.marker.mods('il12', transtype)
+il1b.mods <- run.marker.mods('il1b', transtype)
+il6.mods <- run.marker.mods('il6', transtype)
+il8.mods <- run.marker.mods('il8', transtype)
+mmp9.mods <- run.marker.mods('mmp9', transtype)
+proteinc.mods <- run.marker.mods('proteinc', transtype)
+tnfa.mods <- run.marker.mods('tnfa', transtype)
+tnfr1.mods <- run.marker.mods('tnfr1', transtype)
 
 ## -- Function to check linear model diagnostics ---------------------------------------------------
 check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, title.str = NULL){
@@ -646,67 +679,67 @@ check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, titl
                   outcome.string = out.str, title.string = paste0(time, 'M ', out.str, ' vs % Change, With Weights'))
 }
 
-# ## -- Check diagnostics -----------------------------------------------------------------------------
+## -- Check diagnostics -----------------------------------------------------------------------------
 # ## CRP
 # check.diag.linear(crp.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(crp.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(crp.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(crp.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## IFN-gamma
 # check.diag.linear(ifngamma.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(ifngamma.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## IL-10
 # check.diag.linear(il10.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il10.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## IL-12
 # check.diag.linear(il12.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il12.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## IL-1b
 # check.diag.linear(il1b.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il1b.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## IL-6
 # check.diag.linear(il6.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il6.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## IL-8
 # check.diag.linear(il8.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il8.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## MMP9
 # check.diag.linear(mmp9.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(mmp9.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## Protein C
 # check.diag.linear(proteinc.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(proteinc.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## TNF-alpha
 # check.diag.linear(tnfa.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfa.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
+# 
 # ## TNFR1
 # check.diag.linear(tnfr1.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
@@ -773,7 +806,7 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                                      ' (', rndformat(lcl), ', ',
                                      rndformat(ucl), '); P = ',
                                      formatp(pvalue)))) %>%
-    select(measure.str, mod.type, low, high, results.str) %>%
+    dplyr::select(measure.str, mod.type, low, high, results.str) %>%
     spread(key = mod.type, value = results.str)
 
   results.data[,c('measure.str', 'low', 'high', 'nowt.3', 'wt.3', 'nowt.12', 'wt.12')]
@@ -939,7 +972,8 @@ Models are performed using multiple imputation; all patients who had at least pa
 testing data at a given time point are included in the models. All models included the following
 covariates; with the exception of dexmedetomidine and haloperidol, which had too few unique values,
 all continuous variables (including biomarker) were allowed to have a nonlinear association with the
-outcome using restricted cubic splines.
+outcome using restricted cubic splines. Mean and first biomarker were transformed by taking the base
+10 logarithm, so that extremely high values did not cause problems with model convergence.
 
 \begin{itemize}
 \item Age at enrollment
