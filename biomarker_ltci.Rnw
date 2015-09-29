@@ -361,7 +361,7 @@ dd <- datadist(model.data); options(datadist = 'dd')
 covar.cog <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(iqcode.score.e, 3) + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube + rcs(markervar, 3)"
 
 ## Functional outcomes
-covar.func <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(iqcode.score.e, 3) + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube + adl.e + faq.e + as.numeric(frailty) + markervar"
+covar.func <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(iqcode.score.e, 3) + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube + adl.e + faq.e + as.numeric(frailty) + rcs(markervar, 3)"
 
 ## Function to create model formulas
 make.modform <- function(outcome, markervar, covarstring = c('covar.cog', 'covar.func')){
@@ -503,52 +503,52 @@ run.marker.mods <- function(marker, transmethod = NULL){
     fit.mult.impute(pctchg.trailb12.form, fitter = ols.fix, xtrans = areg.cog.pctchg.12,
                     weights = wt.cog.12, data = model.data.cog.12)
 
-#   ## ADL score ##
-#   ## Mean vs. ADL score
-#   mean.adl3.form <- as.formula(make.modform('adl.totscore.3', paste0(marker, '.mean'), covar.func))
-#   mean.adl.nowt.3 <-
-#     fit.mult.impute(mean.adl3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
-#   mean.adl.wt.3 <-
-#     fit.mult.impute(mean.adl3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
-#                     data = model.data.func.3)
-#
-#   mean.adl12.form <- as.formula(make.modform('adl.totscore.12', paste0(marker, '.mean'), covar.func))
-#   mean.adl.nowt.12 <-
-#     fit.mult.impute(mean.adl12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
-#   mean.adl.wt.12 <-
-#     fit.mult.impute(mean.adl12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
-#                     data = model.data.func.12)
-#
-#   ## First vs. ADL
-#   first.adl3.form <- as.formula(make.modform('adl.totscore.3', paste0(marker, '.first'), covar.func))
-#   first.adl.nowt.3 <-
-#     fit.mult.impute(first.adl3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
-#   first.adl.wt.3 <-
-#     fit.mult.impute(first.adl3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
-#                     data = model.data.func.3)
-#
-#   first.adl12.form <- as.formula(make.modform('adl.totscore.12', paste0(marker, '.first'), covar.func))
-#   first.adl.nowt.12 <-
-#     fit.mult.impute(first.adl12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
-#   first.adl.wt.12 <-
-#     fit.mult.impute(first.adl12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
-#                     data = model.data.func.12)
-#
-#   ## % change vs. ADL
-#   pctchg.adl3.form <- as.formula(make.modform('adl.totscore.3', paste0(marker, '.pctchg'), covar.func))
-#   pctchg.adl.nowt.3 <-
-#     fit.mult.impute(pctchg.adl3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
-#   pctchg.adl.wt.3 <-
-#     fit.mult.impute(pctchg.adl3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
-#                     data = model.data.func.3)
-#
-#   pctchg.adl12.form <- as.formula(make.modform('adl.totscore.12', paste0(marker, '.pctchg'), covar.func))
-#   pctchg.adl.nowt.12 <-
-#     fit.mult.impute(pctchg.adl12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
-#   pctchg.adl.wt.12 <-
-#     fit.mult.impute(pctchg.adl12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
-#                     data = model.data.func.12)
-#
+  ## ADL score ##
+  ## Mean vs. ADL score
+  mean.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.mean, covar.func))
+  mean.adl.nowt.3 <-
+    fit.mult.impute(mean.adl3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
+  mean.adl.wt.3 <-
+    fit.mult.impute(mean.adl3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  mean.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.mean, covar.func))
+  mean.adl.nowt.12 <-
+    fit.mult.impute(mean.adl12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
+  mean.adl.wt.12 <-
+    fit.mult.impute(mean.adl12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
+                    data = model.data.func.12)
+
+  ## First vs. ADL
+  first.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.first, covar.func))
+  first.adl.nowt.3 <-
+    fit.mult.impute(first.adl3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
+  first.adl.wt.3 <-
+    fit.mult.impute(first.adl3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  first.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.first, covar.func))
+  first.adl.nowt.12 <-
+    fit.mult.impute(first.adl12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
+  first.adl.wt.12 <-
+    fit.mult.impute(first.adl12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
+                    data = model.data.func.12)
+
+  ## % change vs. ADL
+  pctchg.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.pctchg, covar.func))
+  pctchg.adl.nowt.3 <-
+    fit.mult.impute(pctchg.adl3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
+  pctchg.adl.wt.3 <-
+    fit.mult.impute(pctchg.adl3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  pctchg.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.pctchg, covar.func))
+  pctchg.adl.nowt.12 <-
+    fit.mult.impute(pctchg.adl12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
+  pctchg.adl.wt.12 <-
+    fit.mult.impute(pctchg.adl12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
+                    data = model.data.func.12)
+
 #   ## FAQ score ##
 #   ## Mean vs. FAQ score
 #   mean.faq3.form <- as.formula(make.modform('faq.totscore.3', paste0(marker, '.mean'), covar.func))
@@ -618,19 +618,19 @@ run.marker.mods <- function(marker, transmethod = NULL){
               'pctchg.trailb.nowt.3' = pctchg.trailb.nowt.3,
               'pctchg.trailb.wt.3' = pctchg.trailb.wt.3,
               'pctchg.trailb.nowt.12' = pctchg.trailb.nowt.12,
-              'pctchg.trailb.wt.12' = pctchg.trailb.wt.12)) #,
-#               'mean.adl.nowt.3' = mean.adl.nowt.3,
-#               'mean.adl.wt.3' = mean.adl.wt.3,
-#               'mean.adl.nowt.12' = mean.adl.nowt.12,
-#               'mean.adl.wt.12' = mean.adl.wt.12,
-#               'first.adl.nowt.3' = first.adl.nowt.3,
-#               'first.adl.wt.3' = first.adl.wt.3,
-#               'first.adl.nowt.12' = first.adl.nowt.12,
-#               'first.adl.wt.12' = first.adl.wt.12,
-#               'pctchg.adl.nowt.3' = pctchg.adl.nowt.3,
-#               'pctchg.adl.wt.3' = pctchg.adl.wt.3,
-#               'pctchg.adl.nowt.12' = pctchg.adl.nowt.12,
-#               'pctchg.adl.wt.12' = pctchg.adl.wt.12,
+              'pctchg.trailb.wt.12' = pctchg.trailb.wt.12,
+              'mean.adl.nowt.3' = mean.adl.nowt.3,
+              'mean.adl.wt.3' = mean.adl.wt.3,
+              'mean.adl.nowt.12' = mean.adl.nowt.12,
+              'mean.adl.wt.12' = mean.adl.wt.12,
+              'first.adl.nowt.3' = first.adl.nowt.3,
+              'first.adl.wt.3' = first.adl.wt.3,
+              'first.adl.nowt.12' = first.adl.nowt.12,
+              'first.adl.wt.12' = first.adl.wt.12,
+              'pctchg.adl.nowt.3' = pctchg.adl.nowt.3,
+              'pctchg.adl.wt.3' = pctchg.adl.wt.3,
+              'pctchg.adl.nowt.12' = pctchg.adl.nowt.12,
+              'pctchg.adl.wt.12' = pctchg.adl.wt.12))#,
 #               'mean.faq.nowt.3' = mean.faq.nowt.3,
 #               'mean.faq.wt.3' = mean.faq.wt.3,
 #               'mean.faq.nowt.12' = mean.faq.nowt.12,
