@@ -54,9 +54,11 @@ ols.diagnostics <- function(model.obj, outcome.string, title.string){
 }
 
 ## -- Function to graphically examine proportional odds assumption ---------------------------------
-po.assume <- function(model.obj,   ## model.obj: model of class lrm()
-                      cuts,        ## cuts: sequence of points to cut outcome
-                      model.data){ ## model.data: data used to fit model
+po.assume <- function(model.obj,          ## model.obj: model of class lrm()
+                      cuts,               ## cuts: sequence of points to cut outcome
+                      plot.vars = NULL,   ## which variables to plot (defaults to all variables)
+                      mfrow.auto = FALSE, ## whether to determine par(mfrow) automatically
+                      model.data){        ## model.data: data used to fit model
   ## Create data set for each coefficient in main model
   cof.names <- names(coef(model.obj))
   all.rows <- 1:length(cof.names)
@@ -83,12 +85,20 @@ po.assume <- function(model.obj,   ## model.obj: model of class lrm()
 
   ## Subset in case some splines didn't make requested number of knots
   cof <- cof[rowSums(is.na(cof[,2:ncol(cof)])) == 0,]
-  ## Get number of rows/columns for plot (plot as close to square as possible)
-  plot.rows <- ceiling(sqrt(nrow(cof)))
 
-  par(mfrow = c(plot.rows, plot.rows), mar = c(2, 4, 1, 1))
+  ## If plot.vars is not null, take only rows for variables of interest
+  if(!is.null(plot.vars)){
+    cof <- cof[grep(plot.vars, cof$var),]
+  }
+
+  if(mfrow.auto){
+    ## Get number of rows/columns for plot (plot as close to square as possible)
+    plot.rows <- ceiling(sqrt(nrow(cof)))
+    par(mfrow = c(plot.rows, plot.rows), mar = c(2, 4, 1, 1))
+  }
+
   for(k in 1:nrow(cof)){
-    plot(cuts, cof[k, 2:ncol(cof)], type = 'l')
+    plot(cuts, cof[k, 2:ncol(cof)], type = 'l', ylab = '')
     title(ylab = cof[k, 'var'], line = 2.5)
     abline(h = 0, lty = 2)
   }
@@ -701,24 +711,37 @@ proteinc.mods <- run.marker.mods('proteinc', transtype)
 tnfa.mods <- run.marker.mods('tnfa', transtype)
 tnfr1.mods <- run.marker.mods('tnfr1', transtype)
 
-## -- Function to check linear model diagnostics ---------------------------------------------------
-check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, title.str = NULL){
-  if(is.null(title.str)){ title.str <- out.str }
-
-  par(mfrow = c(3, 4), cex = 0.5, cex.main = 0.8)
-  ols.diagnostics(model.obj = mod.list[[match(paste0('mean.', out.name, '.nowt.', time), names(mod.list))]],
-                  outcome.string = out.str, title.string = paste0(time, 'M ', out.str, ' vs Mean, No Weights'))
-  ols.diagnostics(model.obj = mod.list[[match(paste0('mean.', out.name, '.wt.', time), names(mod.list))]],
-                  outcome.string = out.str, title.string = paste0(time, 'M ', out.str, ' vs Mean, With Weights'))
-  ols.diagnostics(model.obj = mod.list[[match(paste0('first.', out.name, '.nowt.', time), names(mod.list))]],
-                  outcome.string = out.str, title.string = paste0(time, 'M ', out.str, ' vs First, No Weights'))
-  ols.diagnostics(model.obj = mod.list[[match(paste0('first.', out.name, '.wt.', time), names(mod.list))]],
-                  outcome.string = out.str, title.string = paste0(time, 'M ', out.str, ' vs First, With Weights'))
-  ols.diagnostics(model.obj = mod.list[[match(paste0('pctchg.', out.name, '.nowt.', time), names(mod.list))]],
-                  outcome.string = out.str, title.string = paste0(time, 'M ', out.str, ' vs % Change, No Weights'))
-  ols.diagnostics(model.obj = mod.list[[match(paste0('pctchg.', out.name, '.wt.', time), names(mod.list))]],
-                  outcome.string = out.str, title.string = paste0(time, 'M ', out.str, ' vs % Change, With Weights'))
-}
+# ## -- Function to check linear model diagnostics ---------------------------------------------------
+# check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, title.str = NULL){
+#   ## If no title.str given, set to same as out.str
+#   if(is.null(title.str)){ title.str <- out.str }
+#
+#   par(mfrow = c(3, 4), cex = 0.5, cex.main = 0.8)
+#   ols.diagnostics(model.obj = mod.list[[match(paste0('mean.', out.name, '.nowt.', time),
+#                                               names(mod.list))]],
+#                   outcome.string = out.str,
+#                   title.string = paste0(time, 'M ', out.str, ' vs Mean, No Weights'))
+#   ols.diagnostics(model.obj = mod.list[[match(paste0('mean.', out.name, '.wt.', time),
+#                                               names(mod.list))]],
+#                   outcome.string = out.str,
+#                   title.string = paste0(time, 'M ', out.str, ' vs Mean, With Weights'))
+#   ols.diagnostics(model.obj = mod.list[[match(paste0('first.', out.name, '.nowt.', time),
+#                                               names(mod.list))]],
+#                   outcome.string = out.str,
+#                   title.string = paste0(time, 'M ', out.str, ' vs First, No Weights'))
+#   ols.diagnostics(model.obj = mod.list[[match(paste0('first.', out.name, '.wt.', time),
+#                                               names(mod.list))]],
+#                   outcome.string = out.str,
+#                   title.string = paste0(time, 'M ', out.str, ' vs First, With Weights'))
+#   ols.diagnostics(model.obj = mod.list[[match(paste0('pctchg.', out.name, '.nowt.', time),
+#                                               names(mod.list))]],
+#                   outcome.string = out.str,
+#                   title.string = paste0(time, 'M ', out.str, ' vs % Change, No Weights'))
+#   ols.diagnostics(model.obj = mod.list[[match(paste0('pctchg.', out.name, '.wt.', time),
+#                                               names(mod.list))]],
+#                   outcome.string = out.str,
+#                   title.string = paste0(time, 'M ', out.str, ' vs % Change, With Weights'))
+# }
 
 ## -- Check diagnostics -----------------------------------------------------------------------------
 # ## CRP
@@ -786,6 +809,67 @@ check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, titl
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+
+## -- Check assumptions for POLR models (ADL, FAQ) - unweighted versions only ----------------------
+## Function to check assumptions for all unweighted models for a given biomarker and test
+po.assume.markertest <- function(mod.list, marker, cut.seq, test){
+  po.assume(model.obj = mod.list[[paste0('mean.', test, '.nowt.3')]],
+            cuts = cut.seq, plot.vars = marker, model.data = model.data.func.3)
+  po.assume(model.obj = mod.list[[paste0('mean.', test, '.nowt.12')]],
+            cuts = cut.seq, plot.vars = marker, model.data = model.data.func.12)
+}
+
+## Set cuts for both tests
+adl.cutseq <- seq(1, 8, 1)
+faq.cutseq <- seq(1, 15, 2)
+
+par(mfrow = c(2, 1))
+
+## CRP
+po.assume.markertest(mod.list = crp.mods, marker = 'crp', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = crp.mods, marker = 'crp', cut.seq = faq.cutseq, test = 'faq')
+
+## IFN-gamma
+po.assume.markertest(mod.list = ifngamma.mods, marker = 'ifngamma',
+                     cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = ifngamma.mods, marker = 'ifngamma',
+                     cut.seq = faq.cutseq, test = 'faq')
+
+## IL10
+po.assume.markertest(mod.list = il10.mods, marker = 'il10', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = il10.mods, marker = 'il10', cut.seq = faq.cutseq, test = 'faq')
+
+## IL12
+po.assume.markertest(mod.list = il12.mods, marker = 'il12', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = il12.mods, marker = 'il12', cut.seq = faq.cutseq, test = 'faq')
+
+## IL1b
+po.assume.markertest(mod.list = il1b.mods, marker = 'il1b', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = il1b.mods, marker = 'il1b', cut.seq = faq.cutseq, test = 'faq')
+
+## IL6
+po.assume.markertest(mod.list = il6.mods, marker = 'il6', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = il6.mods, marker = 'il6', cut.seq = faq.cutseq, test = 'faq')
+
+## IL8
+po.assume.markertest(mod.list = il8.mods, marker = 'il8', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = il8.mods, marker = 'il8', cut.seq = faq.cutseq, test = 'faq')
+
+## MMP9
+po.assume.markertest(mod.list = mmp9.mods, marker = 'mmp9', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = mmp9.mods, marker = 'mmp9', cut.seq = faq.cutseq, test = 'faq')
+
+## Protein C
+po.assume.markertest(mod.list = proteinc.mods, marker = 'proteinc', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = proteinc.mods, marker = 'proteinc', cut.seq = faq.cutseq, test = 'faq')
+
+## TNF-alpha
+po.assume.markertest(mod.list = tnfa.mods, marker = 'tnfa', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = tnfa.mods, marker = 'tnfa', cut.seq = faq.cutseq, test = 'faq')
+
+## TNFR1
+po.assume.markertest(mod.list = tnfr1.mods, marker = 'tnfr1', cut.seq = adl.cutseq, test = 'adl')
+po.assume.markertest(mod.list = tnfr1.mods, marker = 'tnfr1', cut.seq = faq.cutseq, test = 'faq')
 
 @
 
