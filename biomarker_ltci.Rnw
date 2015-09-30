@@ -53,7 +53,48 @@ ols.diagnostics <- function(model.obj, outcome.string, title.string){
   }
 }
 
-## Create "fixed" versions of ols() and lrm() to work around bug wih weights argument (thanks, Cole!)
+## -- Function to graphically examine proportional odds assumption ---------------------------------
+po.assume <- function(model.obj,   ## model.obj: model of class lrm()
+                      cuts,        ## cuts: sequence of points to cut outcome
+                      model.data){ ## model.data: data used to fit model
+  ## Create data set for each coefficient in main model
+  cof.names <- names(coef(model.obj))
+  all.rows <- 1:length(cof.names)
+  int.rows <- grep('y>=', cof.names, fixed = TRUE)
+  take.rows <- all.rows[all.rows %nin% int.rows]
+  cof <- data.frame(var = cof.names[take.rows])
+
+  ## Extract formula from model call
+  comp.call <- as.character(formula(model.obj))
+  model.outcome <- comp.call[2]
+  model.formula <- comp.call[3]
+
+  for(k in 1:length(cuts)){
+    cut.mod <-
+      lrm(as.formula(paste0('as.numeric(', model.outcome, ' >= ', cuts[k], ') ~ ', model.formula)),
+          data = model.data)
+
+    cof.temp <- data.frame(var = names(coef(cut.mod)),
+                           hold.place = coef(cut.mod))
+
+    cof <- merge(cof, cof.temp, all.x = TRUE, all.y = FALSE)
+    names(cof) <- gsub('hold.place', paste('coef.cut', cuts[k], sep = '.'), names(cof))
+  }
+
+  ## Subset in case some splines didn't make requested number of knots
+  cof <- cof[rowSums(is.na(cof[,2:ncol(cof)])) == 0,]
+  ## Get number of rows/columns for plot (plot as close to square as possible)
+  plot.rows <- ceiling(sqrt(nrow(cof)))
+
+  par(mfrow = c(plot.rows, plot.rows), mar = c(2, 4, 1, 1))
+  for(k in 1:nrow(cof)){
+    plot(cuts, cof[k, 2:ncol(cof)], type = 'l')
+    title(ylab = cof[k, 'var'], line = 2.5)
+    abline(h = 0, lty = 2)
+  }
+}
+
+## Create "fixed" versions of ols() and lrm() to work around bug w/ weights argument (thanks, Cole!)
 ols.fix <- ols
 trace(ols.fix, quote(m$weights <- substitute(weights)), at=9)
 
@@ -388,7 +429,7 @@ run.marker.mods <- function(marker, transmethod = NULL){
       transmarker.pctchg <- paste0(marker, '.pctchg')
     }
   }
-  
+
   ## RBANS global score ##
   ## Mean vs. RBANS
   mean.rbans3.form <-
@@ -549,51 +590,51 @@ run.marker.mods <- function(marker, transmethod = NULL){
     fit.mult.impute(pctchg.adl12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
                     data = model.data.func.12)
 
-#   ## FAQ score ##
-#   ## Mean vs. FAQ score
-#   mean.faq3.form <- as.formula(make.modform('faq.totscore.3', paste0(marker, '.mean'), covar.func))
-#   mean.faq.nowt.3 <-
-#     fit.mult.impute(mean.faq3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
-#   mean.faq.wt.3 <-
-#     fit.mult.impute(mean.faq3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
-#                     data = model.data.func.3)
-#
-#   mean.faq12.form <- as.formula(make.modform('faq.totscore.12', paste0(marker, '.mean'), covar.func))
-#   mean.faq.nowt.12 <-
-#     fit.mult.impute(mean.faq12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
-#   mean.faq.wt.12 <-
-#     fit.mult.impute(mean.faq12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
-#                     data = model.data.func.12)
-#
-#   ## First vs. FAQ
-#   first.faq3.form <- as.formula(make.modform('faq.totscore.3', paste0(marker, '.first'), covar.func))
-#   first.faq.nowt.3 <-
-#     fit.mult.impute(first.faq3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
-#   first.faq.wt.3 <-
-#     fit.mult.impute(first.faq3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
-#                     data = model.data.func.3)
-#
-#   first.faq12.form <- as.formula(make.modform('faq.totscore.12', paste0(marker, '.first'), covar.func))
-#   first.faq.nowt.12 <-
-#     fit.mult.impute(first.faq12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
-#   first.faq.wt.12 <-
-#     fit.mult.impute(first.faq12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
-#                     data = model.data.func.12)
-#
-#   ## % change vs. FAQ
-#   pctchg.faq3.form <- as.formula(make.modform('faq.totscore.3', paste0(marker, '.pctchg'), covar.func))
-#   pctchg.faq.nowt.3 <-
-#     fit.mult.impute(pctchg.faq3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
-#   pctchg.faq.wt.3 <-
-#     fit.mult.impute(pctchg.faq3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
-#                     data = model.data.func.3)
-#
-#   pctchg.faq12.form <- as.formula(make.modform('faq.totscore.12', paste0(marker, '.pctchg'), covar.func))
-#   pctchg.faq.nowt.12 <-
-#     fit.mult.impute(pctchg.faq12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
-#   pctchg.faq.wt.12 <-
-#     fit.mult.impute(pctchg.faq12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
-#                     data = model.data.func.12)
+  ## FAQ score ##
+  ## Mean vs. FAQ score
+  mean.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.mean, covar.func))
+  mean.faq.nowt.3 <-
+    fit.mult.impute(mean.faq3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
+  mean.faq.wt.3 <-
+    fit.mult.impute(mean.faq3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  mean.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.mean, covar.func))
+  mean.faq.nowt.12 <-
+    fit.mult.impute(mean.faq12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
+  mean.faq.wt.12 <-
+    fit.mult.impute(mean.faq12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
+                    data = model.data.func.12)
+
+  ## First vs. FAQ
+  first.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.first, covar.func))
+  first.faq.nowt.3 <-
+    fit.mult.impute(first.faq3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
+  first.faq.wt.3 <-
+    fit.mult.impute(first.faq3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  first.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.first, covar.func))
+  first.faq.nowt.12 <-
+    fit.mult.impute(first.faq12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
+  first.faq.wt.12 <-
+    fit.mult.impute(first.faq12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
+                    data = model.data.func.12)
+
+  ## % change vs. FAQ
+  pctchg.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.pctchg, covar.func))
+  pctchg.faq.nowt.3 <-
+    fit.mult.impute(pctchg.faq3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
+  pctchg.faq.wt.3 <-
+    fit.mult.impute(pctchg.faq3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  pctchg.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.pctchg, covar.func))
+  pctchg.faq.nowt.12 <-
+    fit.mult.impute(pctchg.faq12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
+  pctchg.faq.wt.12 <-
+    fit.mult.impute(pctchg.faq12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
+                    data = model.data.func.12)
 
   return(list('mean.rbans.nowt.3' = mean.rbans.nowt.3,
               'mean.rbans.wt.3' = mean.rbans.wt.3,
@@ -630,19 +671,19 @@ run.marker.mods <- function(marker, transmethod = NULL){
               'pctchg.adl.nowt.3' = pctchg.adl.nowt.3,
               'pctchg.adl.wt.3' = pctchg.adl.wt.3,
               'pctchg.adl.nowt.12' = pctchg.adl.nowt.12,
-              'pctchg.adl.wt.12' = pctchg.adl.wt.12))#,
-#               'mean.faq.nowt.3' = mean.faq.nowt.3,
-#               'mean.faq.wt.3' = mean.faq.wt.3,
-#               'mean.faq.nowt.12' = mean.faq.nowt.12,
-#               'mean.faq.wt.12' = mean.faq.wt.12,
-#               'first.faq.nowt.3' = first.faq.nowt.3,
-#               'first.faq.wt.3' = first.faq.wt.3,
-#               'first.faq.nowt.12' = first.faq.nowt.12,
-#               'first.faq.wt.12' = first.faq.wt.12,
-#               'pctchg.faq.nowt.3' = pctchg.faq.nowt.3,
-#               'pctchg.faq.wt.3' = pctchg.faq.wt.3,
-#               'pctchg.faq.nowt.12' = pctchg.faq.nowt.12,
-#               'pctchg.faq.wt.12' = pctchg.faq.wt.12))
+              'pctchg.adl.wt.12' = pctchg.adl.wt.12,
+              'mean.faq.nowt.3' = mean.faq.nowt.3,
+              'mean.faq.wt.3' = mean.faq.wt.3,
+              'mean.faq.nowt.12' = mean.faq.nowt.12,
+              'mean.faq.wt.12' = mean.faq.wt.12,
+              'first.faq.nowt.3' = first.faq.nowt.3,
+              'first.faq.wt.3' = first.faq.wt.3,
+              'first.faq.nowt.12' = first.faq.nowt.12,
+              'first.faq.wt.12' = first.faq.wt.12,
+              'pctchg.faq.nowt.3' = pctchg.faq.nowt.3,
+              'pctchg.faq.wt.3' = pctchg.faq.wt.3,
+              'pctchg.faq.nowt.12' = pctchg.faq.nowt.12,
+              'pctchg.faq.wt.12' = pctchg.faq.wt.12))
 }
 
 ## Set character string variable for type of transformation
@@ -685,61 +726,61 @@ check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, titl
 # check.diag.linear(crp.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(crp.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(crp.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## IFN-gamma
 # check.diag.linear(ifngamma.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(ifngamma.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## IL-10
 # check.diag.linear(il10.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il10.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## IL-12
 # check.diag.linear(il12.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il12.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## IL-1b
 # check.diag.linear(il1b.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il1b.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## IL-6
 # check.diag.linear(il6.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il6.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## IL-8
 # check.diag.linear(il8.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il8.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## MMP9
 # check.diag.linear(mmp9.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(mmp9.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## Protein C
 # check.diag.linear(proteinc.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(proteinc.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## TNF-alpha
 # check.diag.linear(tnfa.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfa.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-# 
+#
 # ## TNFR1
 # check.diag.linear(tnfr1.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
