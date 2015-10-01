@@ -99,8 +99,9 @@ po.assume <- function(model.obj,          ## model.obj: model of class lrm()
 
   for(k in 1:nrow(cof)){
     plot(cuts, cof[k, 2:ncol(cof)], type = 'l', ylab = '')
+    title(main = model.outcome)
     title(ylab = cof[k, 'var'], line = 2.5)
-    abline(h = 0, lty = 2)
+    abline(h = 0, lty = 2, col = 'red')
   }
 }
 
@@ -820,56 +821,46 @@ po.assume.markertest <- function(mod.list, marker, cut.seq, test){
 }
 
 ## Set cuts for both tests
-adl.cutseq <- seq(1, 8, 1)
+adl.cutseq <- seq(1, 7, 1)
 faq.cutseq <- seq(1, 15, 2)
 
-par(mfrow = c(2, 1))
+# par(mfrow = c(2, 1))
 
-## CRP
+## All assumptions for ADL in one PDF
+pdf('biomarker_adl_assume.pdf', width = 10.5, height = 8)
+par(mfrow = c(6, 8), mar = c(2, 4, 2, 2))
 po.assume.markertest(mod.list = crp.mods, marker = 'crp', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = crp.mods, marker = 'crp', cut.seq = faq.cutseq, test = 'faq')
-
-## IFN-gamma
 po.assume.markertest(mod.list = ifngamma.mods, marker = 'ifngamma',
                      cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = ifngamma.mods, marker = 'ifngamma',
-                     cut.seq = faq.cutseq, test = 'faq')
-
-## IL10
 po.assume.markertest(mod.list = il10.mods, marker = 'il10', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = il10.mods, marker = 'il10', cut.seq = faq.cutseq, test = 'faq')
-
-## IL12
 po.assume.markertest(mod.list = il12.mods, marker = 'il12', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = il12.mods, marker = 'il12', cut.seq = faq.cutseq, test = 'faq')
-
-## IL1b
 po.assume.markertest(mod.list = il1b.mods, marker = 'il1b', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = il1b.mods, marker = 'il1b', cut.seq = faq.cutseq, test = 'faq')
-
-## IL6
 po.assume.markertest(mod.list = il6.mods, marker = 'il6', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = il6.mods, marker = 'il6', cut.seq = faq.cutseq, test = 'faq')
-
-## IL8
 po.assume.markertest(mod.list = il8.mods, marker = 'il8', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = il8.mods, marker = 'il8', cut.seq = faq.cutseq, test = 'faq')
-
-## MMP9
 po.assume.markertest(mod.list = mmp9.mods, marker = 'mmp9', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = mmp9.mods, marker = 'mmp9', cut.seq = faq.cutseq, test = 'faq')
-
-## Protein C
-po.assume.markertest(mod.list = proteinc.mods, marker = 'proteinc', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = proteinc.mods, marker = 'proteinc', cut.seq = faq.cutseq, test = 'faq')
-
-## TNF-alpha
+po.assume.markertest(mod.list = proteinc.mods, marker = 'proteinc',
+                     cut.seq = adl.cutseq, test = 'adl')
 po.assume.markertest(mod.list = tnfa.mods, marker = 'tnfa', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = tnfa.mods, marker = 'tnfa', cut.seq = faq.cutseq, test = 'faq')
-
-## TNFR1
 po.assume.markertest(mod.list = tnfr1.mods, marker = 'tnfr1', cut.seq = adl.cutseq, test = 'adl')
-po.assume.markertest(mod.list = tnfr1.mods, marker = 'tnfr1', cut.seq = faq.cutseq, test = 'faq')
+dev.off()
+
+## All assumptions for FAQ in one PDF
+pdf('biomarker_faq_assume.pdf', width = 10.5, height = 8)
+par(mfrow = c(6, 8), mar = c(2, 4, 2, 2))
+po.assume.markertest(mod.list = crp.mods, marker = 'crp', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = ifngamma.mods, marker = 'ifngamma',
+                     cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = il10.mods, marker = 'il10', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = il12.mods, marker = 'il12', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = il1b.mods, marker = 'il1b', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = il6.mods, marker = 'il6', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = il8.mods, marker = 'il8', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = mmp9.mods, marker = 'mmp9', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = proteinc.mods, marker = 'proteinc',
+                     cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = tnfa.mods, marker = 'tnfa', cut.seq = adl.cutseq, test = 'faq')
+po.assume.markertest(mod.list = tnfr1.mods, marker = 'tnfr1', cut.seq = adl.cutseq, test = 'faq')
+dev.off()
 
 @
 
