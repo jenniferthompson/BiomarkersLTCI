@@ -1090,6 +1090,7 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
 }
 
 ## -- Get all results for linear models ------------------------------------------------------------
+## Without delirium
 crp.rbans.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'rbans')
 crp.trailb.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'trailb')
 ifngamma.rbans.results <- create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'rbans')
@@ -1112,6 +1113,34 @@ tnfa.rbans.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa',
 tnfa.trailb.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'trailb')
 tnfr1.rbans.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'rbans')
 tnfr1.trailb.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'trailb')
+
+## With delirium
+crp.del.rbans.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'rbans')
+crp.del.trailb.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'trailb')
+ifngamma.del.rbans.results <-
+  create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma', 'rbans')
+ifngamma.del.trailb.results <-
+  create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma', 'trailb')
+il10.del.rbans.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'rbans')
+il10.del.trailb.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'trailb')
+il12.del.rbans.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'rbans')
+il12.del.trailb.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'trailb')
+il1b.del.rbans.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'rbans')
+il1b.del.trailb.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'trailb')
+il6.del.rbans.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'rbans')
+il6.del.trailb.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'trailb')
+il8.del.rbans.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'rbans')
+il8.del.trailb.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'trailb')
+mmp9.del.rbans.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'rbans')
+mmp9.del.trailb.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'trailb')
+proteinc.del.rbans.results <-
+  create.results.table(modlist = proteinc.del.mods, marker = 'proteinc', 'rbans')
+proteinc.del.trailb.results <-
+  create.results.table(modlist = proteinc.del.mods, marker = 'proteinc', 'trailb')
+tnfa.del.rbans.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'rbans')
+tnfa.del.trailb.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'trailb')
+tnfr1.del.rbans.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'rbans')
+tnfr1.del.trailb.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'trailb')
 
 ## -- Function to print results tables in Latex ----------------------------------------------------
 latex.results <- function(resultsdata, markerstr, teststr){
