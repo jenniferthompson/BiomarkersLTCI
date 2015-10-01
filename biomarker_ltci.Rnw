@@ -712,32 +712,41 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
 transtype <- 'log10'
 
 ## Models without delirium
-crp.mods <- run.marker.mods('crp', transtype)
-ifngamma.mods <- run.marker.mods('ifngamma', transtype)
-il10.mods <- run.marker.mods('il10', transtype)
-il12.mods <- run.marker.mods('il12', transtype)
-il1b.mods <- run.marker.mods('il1b', transtype)
-il6.mods <- run.marker.mods('il6', transtype)
-il8.mods <- run.marker.mods('il8', transtype)
-mmp9.mods <- run.marker.mods('mmp9', transtype)
-proteinc.mods <- run.marker.mods('proteinc', transtype)
-tnfa.mods <- run.marker.mods('tnfa', transtype)
-tnfr1.mods <- run.marker.mods('tnfr1', transtype)
+crp.mods <- run.marker.mods('crp', transmethod = transtype)
+ifngamma.mods <- run.marker.mods('ifngamma', transmethod = transtype)
+il10.mods <- run.marker.mods('il10', transmethod = transtype)
+il12.mods <- run.marker.mods('il12', transmethod = transtype)
+il1b.mods <- run.marker.mods('il1b', transmethod = transtype)
+il6.mods <- run.marker.mods('il6', transmethod = transtype)
+il8.mods <- run.marker.mods('il8', transmethod = transtype)
+mmp9.mods <- run.marker.mods('mmp9', transmethod = transtype)
+proteinc.mods <- run.marker.mods('proteinc', transmethod = transtype)
+tnfa.mods <- run.marker.mods('tnfa', transmethod = transtype)
+tnfr1.mods <- run.marker.mods('tnfr1', transmethod = transtype)
 
 ## Models with delirium
-crp.del.mods <- run.marker.mods('crp', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-ifngamma.del.mods <-
-  run.marker.mods('ifngamma', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-il10.del.mods <- run.marker.mods('il10', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-il12.del.mods <- run.marker.mods('il12', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-il1b.del.mods <- run.marker.mods('il1b', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-il6.del.mods <- run.marker.mods('il6', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-il8.del.mods <- run.marker.mods('il8', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-mmp9.del.mods <- run.marker.mods('mmp9', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-proteinc.del.mods <-
-  run.marker.mods('proteinc', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-tnfa.del.mods <- run.marker.mods('tnfa', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
-tnfr1.del.mods <- run.marker.mods('tnfr1', cog.covar = covar.del.cog, func.covar = covar.del.func, transtype)
+crp.del.mods <- run.marker.mods('crp', cog.covar = covar.del.cog,
+                                func.covar = covar.del.func, transmethod = transtype)
+ifngamma.del.mods <- run.marker.mods('ifngamma', cog.covar = covar.del.cog,
+                                     func.covar = covar.del.func, transmethod = transtype)
+il10.del.mods <- run.marker.mods('il10', cog.covar = covar.del.cog,
+                                 func.covar = covar.del.func, transmethod = transtype)
+il12.del.mods <- run.marker.mods('il12', cog.covar = covar.del.cog,
+                                 func.covar = covar.del.func, transmethod = transtype)
+il1b.del.mods <- run.marker.mods('il1b', cog.covar = covar.del.cog,
+                                 func.covar = covar.del.func, transmethod = transtype)
+il6.del.mods <- run.marker.mods('il6', cog.covar = covar.del.cog,
+                                func.covar = covar.del.func, transmethod = transtype)
+il8.del.mods <- run.marker.mods('il8', cog.covar = covar.del.cog,
+                                func.covar = covar.del.func, transmethod = transtype)
+mmp9.del.mods <- run.marker.mods('mmp9', cog.covar = covar.del.cog,
+                                 func.covar = covar.del.func, transmethod = transtype)
+proteinc.del.mods <- run.marker.mods('proteinc', cog.covar = covar.del.cog,
+                                     func.covar = covar.del.func, transmethod = transtype)
+tnfa.del.mods <- run.marker.mods('tnfa', cog.covar = covar.del.cog,
+                                 func.covar = covar.del.func, transmethod = transtype)
+tnfr1.del.mods <- run.marker.mods('tnfr1', cog.covar = covar.del.cog,
+                                  func.covar = covar.del.func, transmethod = transtype)
 
 # ## -- Function to check linear model diagnostics ---------------------------------------------------
 # check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, title.str = NULL){
@@ -1291,11 +1300,19 @@ outcome using restricted cubic splines. Mean and first biomarker were transforme
 propofol, dexmedetomidine, and haloperidol in the ICU
 \end{itemize}
 
+We also ran the above models adding delirium as a covariate, to help investigate any potential
+mediation effects from delirium.
+
 \begin{landscape}
 \subsection{CRP}
-<<printcrprbansresults, results='asis', fig.cap = 'CRP vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+\subsubsection{RBANS}
+<<printcrprbansresults, results='asis', fig.cap = 'CRP vs. RBANS Global Scores, Models Without Delirium', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
 print(plot.test.results(modlist = crp.mods, test = 'rbans', marker = 'crp'))
-latex.results(crp.rbans.results, 'CRP', 'RBANS Global Scores')
+latex.results(crp.rbans.results, 'CRP', 'RBANS Global Scores, Models Without Delirium')
+@
+<<printcrprbansdelresults, results='asis', fig.cap = 'CRP vs. RBANS Global Scores, Models With Delirium', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
+print(plot.test.results(modlist = crp.del.mods, test = 'rbans', marker = 'crp'))
+latex.results(crp.rbans.results, 'CRP', 'RBANS Global Scores, Models With Delirium')
 @
 \clearpage
 <<printcrptrailbresults, results='asis', fig.cap = 'CRP vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 4, fig.pos = '!h'>>=
