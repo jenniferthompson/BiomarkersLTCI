@@ -410,10 +410,18 @@ dd <- datadist(model.data); options(datadist = 'dd')
 
 ## Initial setup: start formulas for each type of model
 ## Cognitive outcomes
+## Delirium *not* included
 covar.cog <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(iqcode.score.e, 3) + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube + rcs(markervar, 3)"
 
+## Delirium included
+covar.del.cog <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(iqcode.score.e, 3) + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube + rcs(del.s.imp, 3) + rcs(markervar, 3)"
+
 ## Functional outcomes
+## Delirium *not* included
 covar.func <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(iqcode.score.e, 3) + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube + adl.e + faq.e + as.numeric(frailty) + rcs(markervar, 3)"
+
+## Delirium included
+covar.del.func <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(iqcode.score.e, 3) + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube + adl.e + faq.e + as.numeric(frailty) + rcs(del.s.imp, 3) + rcs(markervar, 3)"
 
 ## Function to create model formulas
 make.modform <- function(outcome, markervar, covarstring = c('covar.cog', 'covar.func')){
@@ -422,8 +430,11 @@ make.modform <- function(outcome, markervar, covarstring = c('covar.cog', 'covar
 
 ## -- Function to run all models for a given biomarker ---------------------------------------------
 ## marker: string representing prefix for biomarker variable (eg, "crp")
+## cog.covar: string representing righthand side of model spec for cognitive outcomes
+## func.covar: string representing righthand side of model spec for functional outcomes
+   ## both the above should include "markervar" for gsubbing actual biomarker variable names
 ## transmethod: method to transform biomarker variable, corresponding to function (eg, "log10")
-run.marker.mods <- function(marker, transmethod = NULL){
+run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.func, transmethod = NULL){
   ## Create character string representing biomarker variable (+ transformation, if needed) to
   ## include in model formulas
   ## Currently, **no transformations** for % change - negative values create problems
