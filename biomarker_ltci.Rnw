@@ -772,6 +772,7 @@ tnfr1.del.mods <- run.marker.mods('tnfr1', cog.covar = covar.del.cog, func.covar
 # }
 
 ## -- Check diagnostics -----------------------------------------------------------------------------
+## Without delirium
 # ## CRP
 # check.diag.linear(crp.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(crp.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
@@ -837,6 +838,139 @@ tnfr1.del.mods <- run.marker.mods('tnfr1', cog.covar = covar.del.cog, func.covar
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+
+# ## CRP
+# check.diag.linear(crp.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(crp.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(crp.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(crp.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IFN-gamma
+# check.diag.linear(ifngamma.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(ifngamma.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(ifngamma.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(ifngamma.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-10
+# check.diag.linear(il10.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il10.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il10.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il10.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-12
+# check.diag.linear(il12.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il12.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il12.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il12.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-1b
+# check.diag.linear(il1b.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il1b.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il1b.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il1b.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-6
+# check.diag.linear(il6.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il6.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il6.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il6.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-8
+# check.diag.linear(il8.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il8.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il8.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il8.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## MMP9
+# check.diag.linear(mmp9.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(mmp9.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(mmp9.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(mmp9.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## Protein C
+# check.diag.linear(proteinc.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(proteinc.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(proteinc.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(proteinc.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## TNF-alpha
+# check.diag.linear(tnfa.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfa.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfa.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfa.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## TNFR1
+# check.diag.linear(tnfr1.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfr1.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfr1.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfr1.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+
+## With delirium
+# ## CRP
+# check.diag.linear(crp.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(crp.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(crp.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(crp.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IFN-gamma
+# check.diag.linear(ifngamma.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(ifngamma.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(ifngamma.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(ifngamma.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-10
+# check.diag.linear(il10.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il10.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il10.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il10.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-12
+# check.diag.linear(il12.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il12.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il12.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il12.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-1b
+# check.diag.linear(il1b.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il1b.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il1b.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il1b.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-6
+# check.diag.linear(il6.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il6.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il6.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il6.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## IL-8
+# check.diag.linear(il8.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il8.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(il8.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il8.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## MMP9
+# check.diag.linear(mmp9.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(mmp9.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(mmp9.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(mmp9.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## Protein C
+# check.diag.linear(proteinc.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(proteinc.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(proteinc.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(proteinc.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## TNF-alpha
+# check.diag.linear(tnfa.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfa.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfa.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfa.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+#
+# ## TNFR1
+# check.diag.linear(tnfr1.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfr1.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
+# check.diag.linear(tnfr1.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfr1.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
 
 ## -- Check assumptions for POLR models (ADL, FAQ) - unweighted versions only ----------------------
 ## Function to check assumptions for all unweighted models for a given biomarker and test
