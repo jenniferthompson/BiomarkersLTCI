@@ -22,6 +22,9 @@
 opts_chunk$set(echo=FALSE, warning = FALSE, message = FALSE, cache = FALSE, error = FALSE, results='hide')
 options(replace.assign = TRUE, width = 90)
 
+library(mice)
+library(MASS)
+library(pscl)
 library(rms)
 library(caTools)
 library(ggplot2)
@@ -125,9 +128,15 @@ biomarker.vnames <- paste0(c('crp', 'ifngamma', 'il10', 'il12', 'il1b', 'il6', '
 if(Sys.info()['sysname'] == 'Darwin'){
   load('/Volumes/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
   source('/Volumes/thomps23/R/multiplot.r')
+  source('/Volumes/thomps23/R/rmsHelpers/model_results.R')
+  source('/Volumes/thomps23/R/rmsHelpers/combine_cohorts.R')
+  source('/Volumes/thomps23/R/rmsHelpers/latex_rms_results.R')
 } else{
   load('/home/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
   source('/home/thomps23/R/multiplot.r')
+  source('/home/thomps23/R/rmsHelpers/model_results.R')
+  source('/home/thomps23/R/rmsHelpers/combine_cohorts.R')
+  source('/home/thomps23/R/rmsHelpers/latex_rms_results.R')
 }
 
 ## -- Insert data management to combine BRAIN, MIND data sets --------------------------------------
@@ -165,12 +174,15 @@ are included in the functional cohort if they had at least one functional test p
 specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA frailty).
 
 \section{Model Weighting}
-Each model is performed on all survivors in the followup cohort of interest. In order to address selection bias from survival and attrition - i.e., the fact that patients who are alive and have
+Each model is performed on all survivors in the followup cohort of interest. In order to address
+selection bias from survival and attrition - i.e., the fact that patients who are alive and have
 long-term followup data are likely different than patients who do not - we also added inverse
-probability weights to each model in a second version. These weights are calculated by modeling the probability that each patient in the original in-hospital cohort contributes to each followup cohort, then taking the inverse of this estimated weight. In our weighting mdoels, we included age; Charlson
-score; education; IQCODE; Framingham stroke risk score; mean 24-hour doses of benzodiazepines,
-opioids, propofol, dexmedetomidine, and haloperidol (cube root transformed); duration of severe
-sepsis, delirium, and coma; and mean modified SOFA.
+probability weights to each model in a second version. These weights are calculated by modeling the
+probability that each patient in the original in-hospital cohort contributes to each followup
+cohort, then taking the inverse of this estimated weight. In our weighting mdoels, we included age;
+Charlson score; education; IQCODE; Framingham stroke risk score; mean 24-hour doses of
+benzodiazepines, opioids, propofol, dexmedetomidine, and haloperidol (cube root transformed);
+duration of severe sepsis, delirium, and coma; and mean modified SOFA.
 
 Figure \ref{fig:weighthist} shows the distribution of these inverse probability weights and the
 number of patients included in the final cohorts.
@@ -210,7 +222,12 @@ bio.summary.pt <- all.daily[,c('id', 'study.day', biomarker.vnames)] %>%
             pt.max = max(bio.value, na.rm = TRUE),
             pt.first = head(bio.value, n = 1),
             pt.last = tail(bio.value, n = 1),
-            pt.auc = trapz(x = study.day, y = bio.value))
+            pt.auc = trapz(x = study.day, y = bio.value)) %>%
+  mutate(pt.mean.t = log10(pt.mean),
+         pt.min.t = log10(pt.min),
+         pt.max.t = log10(pt.max),
+         pt.first.t = log10(pt.first),
+         pt.last.t = log10(pt.last))
 bio.summary.pt$pt.delta <- with(bio.summary.pt, ifelse(pt.n == 1, NA, pt.last - pt.first))
 bio.summary.pt$pt.pctchg <-
   with(bio.summary.pt, ifelse(pt.n == 1, NA, ((pt.last - pt.first) / pt.first)))
