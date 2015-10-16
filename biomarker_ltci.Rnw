@@ -262,9 +262,9 @@ set.seed(1)
 areg.weight <- aregImpute(~ age.enroll + charlson.score + I(edu) + I(iqcode.score.e) + stroke.risk +
                             mean.benz.cube + mean.op.cube + mean.prop.cube + I(mean.dex.cube) +
                             I(mean.hal.cube) + icudays.sevseptic.s + del.s.imp + coma.s.imp +
-                            mean.modsofa.icu + crp.mean + ifngamma.mean + il10.mean + il12.mean +
-                            il1b.mean + il6.mean + il8.mean + mmp9.mean + proteinc.mean + tnfa.mean +
-                            tnfr1.mean,
+                            mean.modsofa.icu + crp.mean.t + ifngamma.mean.t + il10.mean.t +
+                            il12.mean.t + il1b.mean.t + il6.mean.t + il8.mean.t + mmp9.mean.t +
+                            proteinc.mean.t + tnfa.mean.t + tnfr1.mean.t,
                           n.impute = 10,
                           nk = 3,
                           data = model.data)
@@ -278,10 +278,10 @@ prob.cohort <- function(cohort.var){
                               rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube +
                               rcs(icudays.sevseptic.s, 3) + rcs(del.s.imp, 3) +
                               rcs(coma.s.imp, 3) + rcs(mean.modsofa.icu, 3) +
-                              rcs(crp.mean, 3) + rcs(ifngamma.mean, 3) +
-                              rcs(il10.mean, 3) + rcs(il12.mean, 3) + rcs(il1b.mean, 3) +
-                              rcs(il6.mean, 3) + il8.mean + rcs(mmp9.mean, 3) +
-                              rcs(proteinc.mean, 3) + rcs(tnfa.mean, 3) + rcs(tnfr1.mean, 3)",
+                              rcs(crp.mean.t, 3) + rcs(ifngamma.mean.t, 3) +
+                              rcs(il10.mean.t, 3) + rcs(il12.mean.t, 3) + rcs(il1b.mean.t, 3) +
+                              rcs(il6.mean.t, 3) + il8.mean.t + rcs(mmp9.mean.t, 3) +
+                              rcs(proteinc.mean.t, 3) + rcs(tnfa.mean.t, 3) + rcs(tnfr1.mean.t, 3)",
                             sep = ' ~ ')),
                             fitter = lrm,
                             xtrans = areg.weight,
@@ -380,13 +380,13 @@ multiplot(plotlist = wthist.list, layout = matrix(1:4, ncol = 4, byrow = TRUE))
 @
 
 <<biomodels>>=
+
+## -- Create multiple imputation objects -----------------------------------------------------------
 ## Create data sets with only patients in each cohort
 model.data.cog.3 <- subset(model.data, cog.cohort.3)
 model.data.cog.12 <- subset(model.data, cog.cohort.12)
-model.data.func.3 <- subset(model.data, func.cohort.3)
-model.data.func.12 <- subset(model.data, func.cohort.12)
 
-## -- Create multiple imputation objects -----------------------------------------------------------
+## Use aregImpute for cognitive outcomes
 create.areg.obj <- function(cohort.data, marker.measure){
   areg.formula <-
     as.formula(paste0('~ ',
@@ -412,12 +412,66 @@ areg.cog.first.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'first'
 areg.cog.pctchg.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'pctchg')
 areg.cog.pctchg.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'pctchg')
 
-areg.func.mean.3 <- create.areg.obj(model.data.func.3, marker.measure = 'mean')
-areg.func.mean.12 <- create.areg.obj(model.data.func.12, marker.measure = 'mean')
-areg.func.first.3 <- create.areg.obj(model.data.func.3, marker.measure = 'first')
-areg.func.first.12 <- create.areg.obj(model.data.func.12, marker.measure = 'first')
-areg.func.pctchg.3 <- create.areg.obj(model.data.func.3, marker.measure = 'pctchg')
-areg.func.pctchg.12 <- create.areg.obj(model.data.func.12, marker.measure = 'pctchg')
+## Use mice for functional outcomes ##
+## Create vector of variables to include in all imputations (covariates, outcome scores)
+always.use <- c('age.enroll', 'charlson.score', 'edu', 'iqcode.score.e', 'stroke.risk',
+                'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube', 'mean.dex.cube',
+                'mean.hal.cube', 'adl.e', 'faq.e', 'frailty', 'icudays.sevseptic.s',
+                'mean.modsofa.icu', 'del.s.imp', 'coma.s.imp', 'vent.los.tot.s', 'adl.totscore.12',
+                'adl.totscore.3', 'faq.totscore.12', 'faq.totscore.3', 'rbans.global.score.12',
+                'rbans.global.score.3', 'trail.b.tscore.12', 'trail.b.tscore.3')
+
+## Create data sets with only patients included in each time point cohort
+model.data.func.3 <- model.data[model.data$func.cohort.3,
+                                c(always.use,
+                                  gsub('\\.imp', '\\.mean.t', biomarker.vnames),
+                                  gsub('\\.imp', '\\.first.t', biomarker.vnames),
+                                  gsub('\\.imp', '\\.pctchg', biomarker.vnames))]
+
+model.data.func.12 <- model.data[model.data$func.cohort.12,
+                                 c(always.use,
+                                   gsub('\\.imp', '\\.mean.t', biomarker.vnames),
+                                   gsub('\\.imp', '\\.first.t', biomarker.vnames),
+                                   gsub('\\.imp', '\\.pctchg', biomarker.vnames))]
+
+## Create prediction matrix to use in mice() (same applies to both time points)
+## Create vector that is all 1s; function will replace diagonal and unused biomarker measures with 0s
+tmp <- rep(1, ncol(model.data.func.3))
+names(tmp) <- colnames(model.data.func.3)
+create.mice.predmat <- function(marker.measure = c('mean', 'first', 'pctchg')){
+  tmpmat <- do.call(rbind,
+                    lapply(names(model.data.func.3), FUN = function(x){
+                      tmp2 <- tmp
+                      
+                      ## Which marker measures are *not* being used?
+                      not.used <- setdiff(c('mean', 'first', 'pctchg'), marker.measure)
+                      not.used <- gsub('mean', 'mean\\.t', not.used)
+                      not.used <- gsub('first', 'first\\.t', not.used)
+                      
+                      replace.vars <-
+                        unique(c(x,
+                                 gsub('\\.imp', paste0('\\.', not.used[1]), biomarker.vnames),
+                                 gsub('\\.imp', paste0('\\.', not.used[2]), biomarker.vnames)))
+            
+                      tmp2[replace.vars] <- 0
+                      return(tmp2)
+                    }))
+  
+  rownames(tmpmat) <- colnames(tmpmat) <- names(model.data.func.3)
+  return(tmpmat)
+}
+
+mice.predmat.mean <- create.mice.predmat('mean')
+mice.predmat.first <- create.mice.predmat('first')
+mice.predmat.pctchg <- create.mice.predmat('pctchg')
+
+## Create mice object for each biomarker measure
+mice.mean.3 <- mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.mean, seed = 56)
+mice.mean.12 <- mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.mean, seed = 56)
+mice.first.3 <- mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.first, seed = 56)
+mice.first.12 <- mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.first, seed = 56)
+mice.pctchg.3 <- mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
+mice.pctchg.12 <- mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
 
 dd <- datadist(model.data); options(datadist = 'dd')
 
@@ -584,97 +638,97 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
     fit.mult.impute(pctchg.trailb12.form, fitter = ols.fix, xtrans = areg.cog.pctchg.12,
                     weights = wt.cog.12, data = model.data.cog.12)
 
-  ## ADL score ##
-  ## Mean vs. ADL score
-  mean.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.mean, func.covar))
-  mean.adl.nowt.3 <-
-    fit.mult.impute(mean.adl3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
-  mean.adl.wt.3 <-
-    fit.mult.impute(mean.adl3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
-                    data = model.data.func.3)
-
-  mean.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.mean, func.covar))
-  mean.adl.nowt.12 <-
-    fit.mult.impute(mean.adl12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
-  mean.adl.wt.12 <-
-    fit.mult.impute(mean.adl12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
-                    data = model.data.func.12)
-
-  ## First vs. ADL
-  first.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.first, func.covar))
-  first.adl.nowt.3 <-
-    fit.mult.impute(first.adl3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
-  first.adl.wt.3 <-
-    fit.mult.impute(first.adl3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
-                    data = model.data.func.3)
-
-  first.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.first, func.covar))
-  first.adl.nowt.12 <-
-    fit.mult.impute(first.adl12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
-  first.adl.wt.12 <-
-    fit.mult.impute(first.adl12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
-                    data = model.data.func.12)
-
-  ## % change vs. ADL
-  pctchg.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.pctchg, func.covar))
-  pctchg.adl.nowt.3 <-
-    fit.mult.impute(pctchg.adl3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
-  pctchg.adl.wt.3 <-
-    fit.mult.impute(pctchg.adl3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
-                    data = model.data.func.3)
-
-  pctchg.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.pctchg, func.covar))
-  pctchg.adl.nowt.12 <-
-    fit.mult.impute(pctchg.adl12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
-  pctchg.adl.wt.12 <-
-    fit.mult.impute(pctchg.adl12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
-                    data = model.data.func.12)
-
-  ## FAQ score ##
-  ## Mean vs. FAQ score
-  mean.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.mean, func.covar))
-  mean.faq.nowt.3 <-
-    fit.mult.impute(mean.faq3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
-  mean.faq.wt.3 <-
-    fit.mult.impute(mean.faq3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
-                    data = model.data.func.3)
-
-  mean.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.mean, func.covar))
-  mean.faq.nowt.12 <-
-    fit.mult.impute(mean.faq12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
-  mean.faq.wt.12 <-
-    fit.mult.impute(mean.faq12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
-                    data = model.data.func.12)
-
-  ## First vs. FAQ
-  first.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.first, func.covar))
-  first.faq.nowt.3 <-
-    fit.mult.impute(first.faq3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
-  first.faq.wt.3 <-
-    fit.mult.impute(first.faq3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
-                    data = model.data.func.3)
-
-  first.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.first, func.covar))
-  first.faq.nowt.12 <-
-    fit.mult.impute(first.faq12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
-  first.faq.wt.12 <-
-    fit.mult.impute(first.faq12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
-                    data = model.data.func.12)
-
-  ## % change vs. FAQ
-  pctchg.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.pctchg, func.covar))
-  pctchg.faq.nowt.3 <-
-    fit.mult.impute(pctchg.faq3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
-  pctchg.faq.wt.3 <-
-    fit.mult.impute(pctchg.faq3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
-                    data = model.data.func.3)
-
-  pctchg.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.pctchg, func.covar))
-  pctchg.faq.nowt.12 <-
-    fit.mult.impute(pctchg.faq12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
-  pctchg.faq.wt.12 <-
-    fit.mult.impute(pctchg.faq12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
-                    data = model.data.func.12)
+#   ## ADL score ##
+#   ## Mean vs. ADL score
+#   mean.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.mean, func.covar))
+#   mean.adl.nowt.3 <-
+#     fit.mult.impute(mean.adl3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
+#   mean.adl.wt.3 <-
+#     fit.mult.impute(mean.adl3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
+#                     data = model.data.func.3)
+# 
+#   mean.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.mean, func.covar))
+#   mean.adl.nowt.12 <-
+#     fit.mult.impute(mean.adl12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
+#   mean.adl.wt.12 <-
+#     fit.mult.impute(mean.adl12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
+#                     data = model.data.func.12)
+# 
+#   ## First vs. ADL
+#   first.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.first, func.covar))
+#   first.adl.nowt.3 <-
+#     fit.mult.impute(first.adl3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
+#   first.adl.wt.3 <-
+#     fit.mult.impute(first.adl3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
+#                     data = model.data.func.3)
+# 
+#   first.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.first, func.covar))
+#   first.adl.nowt.12 <-
+#     fit.mult.impute(first.adl12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
+#   first.adl.wt.12 <-
+#     fit.mult.impute(first.adl12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
+#                     data = model.data.func.12)
+# 
+#   ## % change vs. ADL
+#   pctchg.adl3.form <- as.formula(make.modform('adl.totscore.3', transmarker.pctchg, func.covar))
+#   pctchg.adl.nowt.3 <-
+#     fit.mult.impute(pctchg.adl3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
+#   pctchg.adl.wt.3 <-
+#     fit.mult.impute(pctchg.adl3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
+#                     data = model.data.func.3)
+# 
+#   pctchg.adl12.form <- as.formula(make.modform('adl.totscore.12', transmarker.pctchg, func.covar))
+#   pctchg.adl.nowt.12 <-
+#     fit.mult.impute(pctchg.adl12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
+#   pctchg.adl.wt.12 <-
+#     fit.mult.impute(pctchg.adl12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
+#                     data = model.data.func.12)
+# 
+#   ## FAQ score ##
+#   ## Mean vs. FAQ score
+#   mean.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.mean, func.covar))
+#   mean.faq.nowt.3 <-
+#     fit.mult.impute(mean.faq3.form, fitter = lrm, xtrans = areg.func.mean.3, data = model.data.func.3)
+#   mean.faq.wt.3 <-
+#     fit.mult.impute(mean.faq3.form, fitter = lrm.fix, xtrans = areg.func.mean.3, weights = wt.func.3,
+#                     data = model.data.func.3)
+# 
+#   mean.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.mean, func.covar))
+#   mean.faq.nowt.12 <-
+#     fit.mult.impute(mean.faq12.form, fitter = lrm, xtrans = areg.func.mean.12, data = model.data.func.12)
+#   mean.faq.wt.12 <-
+#     fit.mult.impute(mean.faq12.form, fitter = lrm.fix, xtrans = areg.func.mean.12, weights = wt.func.12,
+#                     data = model.data.func.12)
+# 
+#   ## First vs. FAQ
+#   first.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.first, func.covar))
+#   first.faq.nowt.3 <-
+#     fit.mult.impute(first.faq3.form, fitter = lrm, xtrans = areg.func.first.3, data = model.data.func.3)
+#   first.faq.wt.3 <-
+#     fit.mult.impute(first.faq3.form, fitter = lrm.fix, xtrans = areg.func.first.3, weights = wt.func.3,
+#                     data = model.data.func.3)
+# 
+#   first.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.first, func.covar))
+#   first.faq.nowt.12 <-
+#     fit.mult.impute(first.faq12.form, fitter = lrm, xtrans = areg.func.first.12, data = model.data.func.12)
+#   first.faq.wt.12 <-
+#     fit.mult.impute(first.faq12.form, fitter = lrm.fix, xtrans = areg.func.first.12, weights = wt.func.12,
+#                     data = model.data.func.12)
+# 
+#   ## % change vs. FAQ
+#   pctchg.faq3.form <- as.formula(make.modform('faq.totscore.3', transmarker.pctchg, func.covar))
+#   pctchg.faq.nowt.3 <-
+#     fit.mult.impute(pctchg.faq3.form, fitter = lrm, xtrans = areg.func.pctchg.3, data = model.data.func.3)
+#   pctchg.faq.wt.3 <-
+#     fit.mult.impute(pctchg.faq3.form, fitter = lrm.fix, xtrans = areg.func.pctchg.3, weights = wt.func.3,
+#                     data = model.data.func.3)
+# 
+#   pctchg.faq12.form <- as.formula(make.modform('faq.totscore.12', transmarker.pctchg, func.covar))
+#   pctchg.faq.nowt.12 <-
+#     fit.mult.impute(pctchg.faq12.form, fitter = lrm, xtrans = areg.func.pctchg.12, data = model.data.func.12)
+#   pctchg.faq.wt.12 <-
+#     fit.mult.impute(pctchg.faq12.form, fitter = lrm.fix, xtrans = areg.func.pctchg.12, weights = wt.func.12,
+#                     data = model.data.func.12)
 
   return(list('mean.rbans.nowt.3' = mean.rbans.nowt.3,
               'mean.rbans.wt.3' = mean.rbans.wt.3,
@@ -699,31 +753,31 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
               'pctchg.trailb.nowt.3' = pctchg.trailb.nowt.3,
               'pctchg.trailb.wt.3' = pctchg.trailb.wt.3,
               'pctchg.trailb.nowt.12' = pctchg.trailb.nowt.12,
-              'pctchg.trailb.wt.12' = pctchg.trailb.wt.12,
-              'mean.adl.nowt.3' = mean.adl.nowt.3,
-              'mean.adl.wt.3' = mean.adl.wt.3,
-              'mean.adl.nowt.12' = mean.adl.nowt.12,
-              'mean.adl.wt.12' = mean.adl.wt.12,
-              'first.adl.nowt.3' = first.adl.nowt.3,
-              'first.adl.wt.3' = first.adl.wt.3,
-              'first.adl.nowt.12' = first.adl.nowt.12,
-              'first.adl.wt.12' = first.adl.wt.12,
-              'pctchg.adl.nowt.3' = pctchg.adl.nowt.3,
-              'pctchg.adl.wt.3' = pctchg.adl.wt.3,
-              'pctchg.adl.nowt.12' = pctchg.adl.nowt.12,
-              'pctchg.adl.wt.12' = pctchg.adl.wt.12,
-              'mean.faq.nowt.3' = mean.faq.nowt.3,
-              'mean.faq.wt.3' = mean.faq.wt.3,
-              'mean.faq.nowt.12' = mean.faq.nowt.12,
-              'mean.faq.wt.12' = mean.faq.wt.12,
-              'first.faq.nowt.3' = first.faq.nowt.3,
-              'first.faq.wt.3' = first.faq.wt.3,
-              'first.faq.nowt.12' = first.faq.nowt.12,
-              'first.faq.wt.12' = first.faq.wt.12,
-              'pctchg.faq.nowt.3' = pctchg.faq.nowt.3,
-              'pctchg.faq.wt.3' = pctchg.faq.wt.3,
-              'pctchg.faq.nowt.12' = pctchg.faq.nowt.12,
-              'pctchg.faq.wt.12' = pctchg.faq.wt.12))
+              'pctchg.trailb.wt.12' = pctchg.trailb.wt.12))#,
+#               'mean.adl.nowt.3' = mean.adl.nowt.3,
+#               'mean.adl.wt.3' = mean.adl.wt.3,
+#               'mean.adl.nowt.12' = mean.adl.nowt.12,
+#               'mean.adl.wt.12' = mean.adl.wt.12,
+#               'first.adl.nowt.3' = first.adl.nowt.3,
+#               'first.adl.wt.3' = first.adl.wt.3,
+#               'first.adl.nowt.12' = first.adl.nowt.12,
+#               'first.adl.wt.12' = first.adl.wt.12,
+#               'pctchg.adl.nowt.3' = pctchg.adl.nowt.3,
+#               'pctchg.adl.wt.3' = pctchg.adl.wt.3,
+#               'pctchg.adl.nowt.12' = pctchg.adl.nowt.12,
+#               'pctchg.adl.wt.12' = pctchg.adl.wt.12,
+#               'mean.faq.nowt.3' = mean.faq.nowt.3,
+#               'mean.faq.wt.3' = mean.faq.wt.3,
+#               'mean.faq.nowt.12' = mean.faq.nowt.12,
+#               'mean.faq.wt.12' = mean.faq.wt.12,
+#               'first.faq.nowt.3' = first.faq.nowt.3,
+#               'first.faq.wt.3' = first.faq.wt.3,
+#               'first.faq.nowt.12' = first.faq.nowt.12,
+#               'first.faq.wt.12' = first.faq.wt.12,
+#               'pctchg.faq.nowt.3' = pctchg.faq.nowt.3,
+#               'pctchg.faq.wt.3' = pctchg.faq.wt.3,
+#               'pctchg.faq.nowt.12' = pctchg.faq.nowt.12,
+#               'pctchg.faq.wt.12' = pctchg.faq.wt.12))
 }
 
 ## Set character string variable for type of transformation
