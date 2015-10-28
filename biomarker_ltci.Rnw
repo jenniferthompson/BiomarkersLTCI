@@ -23,6 +23,7 @@ opts_chunk$set(echo=FALSE, warning = FALSE, message = FALSE, cache = FALSE, erro
 options(replace.assign = TRUE, width = 90)
 
 library(mice)
+library(ClusterBootMultinom)
 library(MASS)
 library(pscl)
 library(rms)
@@ -126,11 +127,19 @@ biomarker.vnames <- paste0(c('crp', 'ifngamma', 'il10', 'il12', 'il1b', 'il6', '
 
 ## Load all BRAIN data
 if(Sys.info()['sysname'] == 'Darwin'){
-  load('/Volumes/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
-  source('/Volumes/thomps23/R/multiplot.r')
-  source('/Volumes/thomps23/R/rmsHelpers/model_results.R')
-  source('/Volumes/thomps23/R/rmsHelpers/combine_cohorts.R')
-  source('/Volumes/thomps23/R/rmsHelpers/latex_rms_results.R')
+  if(length(grep('Volumes', getwd())) > 0){
+    load('/Volumes/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
+    source('/Volumes/thomps23/R/multiplot.r')
+    source('/Volumes/thomps23/R/rmsHelpers/model_results.R')
+    source('/Volumes/thomps23/R/rmsHelpers/combine_cohorts.R')
+    source('/Volumes/thomps23/R/rmsHelpers/latex_rms_results.R')
+  } else{
+    load('braindata.Rdata')
+    source('multiplot.r')
+    source('model_results.R')
+    source('combine_cohorts.R')
+    source('latex_rms_results.R')
+  }
 } else{
   load('/home/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
   source('/home/thomps23/R/multiplot.r')
@@ -494,46 +503,56 @@ covar.del.cog <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rc
 ## Functional outcomes
 ## Delirium *not* included
 covar.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + rcs(markervar, 3)"
+covar.func.nobio <- gsub(' + rcs(markervar, 3)', '', covar.func, fixed = TRUE)
 
 ## Delirium included
 covar.del.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + del.s.imp + rcs(markervar, 3)"
+covar.del.func.nobio <- gsub(' + rcs(markervar, 3)', '', covar.del.func, fixed = TRUE)
 
-## For functional outcomes, fit models without biomarker terms to use for LR test - WORK ON THIS
-# nobio.adl.3 <- with(mice.mean.3,
-#                     glm.nb(adl.totscore.3 ~ rcs(age.enroll, 3) + rcs(charlson.score, 3) + edu +
-#                              iqcode.score.e + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) +
-#                              rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube +
-#                              mean.hal.cube + adl.e + faq.e + as.numeric(frailty)))
-# 
-# nobio.adl.12 <- with(mice.mean.12,
-#                      glm.nb(adl.totscore.12 ~ rcs(age.enroll, 3) + rcs(charlson.score, 3) + edu +
-#                               iqcode.score.e + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) +
-#                               rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube +
-#                               mean.hal.cube + adl.e + faq.e + as.numeric(frailty)))
-# 
-# nobio.del.adl.3 <- with(mice.mean.3,
-#                         glm.nb(adl.totscore.3 ~ age.enroll + charlson.score + edu +
-#                                  iqcode.score.e + mean.benz.cube + mean.dex.cube + mean.hal.cube +
-#                                  mean.op.cube + mean.prop.cube + adl.e + faq.e + del.s.imp +
-#                                  rcs(ifngamma.mean.t, 3)))
-# 
-# nobio.del.adl.12 <- with(mice.mean.12,
-#                         glm.nb(adl.totscore.12 ~ age.enroll + charlson.score + edu +
-#                                  iqcode.score.e + mean.benz.cube + mean.dex.cube + mean.hal.cube +
-#                                  mean.op.cube + mean.prop.cube + adl.e + faq.e + del.s.imp +
-#                                  rcs(ifngamma.mean.t, 3)))
-# 
-# nobio.del.faq.3 <- with(mice.mean.3,
-#                         glm.nb(faq.rdscore.3 ~ age.enroll + charlson.score + edu +
-#                                  iqcode.score.e + mean.benz.cube + mean.dex.cube + mean.hal.cube +
-#                                  mean.op.cube + mean.prop.cube + adl.e + faq.e + del.s.imp +
-#                                  rcs(ifngamma.mean.t, 3)))
-# 
-# nobio.del.faq.12 <- with(mice.mean.12,
-#                         glm.nb(faq.rdscore.12 ~ age.enroll + charlson.score + edu +
-#                                  iqcode.score.e + mean.benz.cube + mean.dex.cube + mean.hal.cube +
-#                                  mean.op.cube + mean.prop.cube + adl.e + faq.e + del.s.imp +
-#                                  rcs(il1b.mean.t, 3)))
+## For functional outcomes, fit models without biomarker terms to use for LR test
+## ADL
+nobio.adl.nowt.3 <- with(mice.mean.3,
+                         glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
+nobio.adl.wt.3 <- with(mice.mean.3,
+                       glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                              weights = wt.func.3))
+nobio.adl.nowt.12 <- with(mice.mean.12,
+                          glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
+nobio.adl.wt.12 <- with(mice.mean.12,
+                        glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                               weights = wt.func.12))
+nobio.del.adl.nowt.3 <- with(mice.mean.3,
+                             glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
+nobio.del.adl.wt.3 <- with(mice.mean.3,
+                           glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                  weights = wt.func.3))
+nobio.del.adl.nowt.12 <- with(mice.mean.12,
+                              glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
+nobio.del.adl.wt.12 <- with(mice.mean.12,
+                            glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                   weights = wt.func.12))
+
+## FAQ
+nobio.faq.nowt.3 <- with(mice.mean.3,
+                         glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
+nobio.faq.wt.3 <- with(mice.mean.3,
+                       glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                              weights = wt.func.3))
+nobio.faq.nowt.12 <- with(mice.mean.12,
+                          glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
+nobio.faq.wt.12 <- with(mice.mean.12,
+                        glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                               weights = wt.func.12))
+nobio.del.faq.nowt.3 <- with(mice.mean.3,
+                             glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
+nobio.del.faq.wt.3 <- with(mice.mean.3,
+                           glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                  weights = wt.func.3))
+nobio.del.faq.nowt.12 <- with(mice.mean.12,
+                              glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
+nobio.del.faq.wt.12 <- with(mice.mean.12,
+                            glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                   weights = wt.func.12))
 
 ## Function to create model formulas
 make.modform <- function(outcome,
@@ -1145,6 +1164,208 @@ tnfr1.del.mods <- run.marker.mods('tnfr1',
 # po.assume.markertest(mod.list = tnfr1.mods, marker = 'tnfr1', cut.seq = adl.cutseq, test = 'faq')
 # dev.off()
 
+## -- Function to get LR p-values for biomarkers from functional outcome models --------------------
+func.bio.pvals <- function(mod.list, inc.del = FALSE, use.method = c('Wald', 'likelihood')){
+  if(inc.del){
+    ref.adl.nowt.3 <- nobio.del.adl.nowt.3
+    ref.adl.wt.3 <- nobio.del.adl.wt.3
+    ref.adl.nowt.12 <- nobio.del.adl.nowt.12
+    ref.adl.wt.12 <- nobio.del.adl.wt.12
+    ref.faq.nowt.3 <- nobio.del.faq.nowt.3
+    ref.faq.wt.3 <- nobio.del.faq.wt.3
+    ref.faq.nowt.12 <- nobio.del.faq.nowt.12
+    ref.faq.wt.12 <- nobio.del.faq.wt.12
+  } else{
+    ref.adl.nowt.3 <- nobio.adl.nowt.3
+    ref.adl.wt.3 <- nobio.adl.wt.3
+    ref.adl.nowt.12 <- nobio.adl.nowt.12
+    ref.adl.wt.12 <- nobio.adl.wt.12
+    ref.faq.nowt.3 <- nobio.faq.nowt.3
+    ref.faq.wt.3 <- nobio.faq.wt.3
+    ref.faq.nowt.12 <- nobio.faq.nowt.12
+    ref.faq.wt.12 <- nobio.faq.wt.12
+  }
+
+  ## ADL ##
+  p.mean.adl.nowt.3 <- pool.compare(mod.list[['mean.adl.nowt.3']], ref.adl.nowt.3,
+                                    data = mice.mean.3, method = use.method)$pvalue
+  p.mean.adl.wt.3 <- pool.compare(mod.list[['mean.adl.wt.3']], ref.adl.wt.3,
+                                  data = mice.mean.3, method = use.method)$pvalue
+  p.mean.adl.nowt.12 <- pool.compare(mod.list[['mean.adl.nowt.12']], ref.adl.nowt.12,
+                                     data = mice.mean.12, method = use.method)$pvalue
+  p.mean.adl.wt.12 <- pool.compare(mod.list[['mean.adl.wt.12']], ref.adl.wt.12,
+                                   data = mice.mean.12, method = use.method)$pvalue
+  p.first.adl.nowt.3 <- pool.compare(mod.list[['first.adl.nowt.3']], ref.adl.nowt.3,
+                                     data = mice.first.3, method = use.method)$pvalue
+  p.first.adl.wt.3 <- pool.compare(mod.list[['first.adl.wt.3']], ref.adl.wt.3,
+                                   data = mice.first.3, method = use.method)$pvalue
+  p.first.adl.nowt.12 <- pool.compare(mod.list[['first.adl.nowt.12']], ref.adl.nowt.12,
+                                      data = mice.first.12, method = use.method)$pvalue
+  p.first.adl.wt.12 <- pool.compare(mod.list[['first.adl.wt.12']], ref.adl.wt.12,
+                                    data = mice.first.12, method = use.method)$pvalue
+  p.pctchg.adl.nowt.3 <- pool.compare(mod.list[['pctchg.adl.nowt.3']], ref.adl.nowt.3,
+                                      data = mice.pctchg.3, method = use.method)$pvalue
+  p.pctchg.adl.wt.3 <- pool.compare(mod.list[['pctchg.adl.wt.3']], ref.adl.wt.3,
+                                    data = mice.pctchg.3, method = use.method)$pvalue
+  p.pctchg.adl.nowt.12 <- pool.compare(mod.list[['pctchg.adl.nowt.12']], ref.adl.nowt.12,
+                                       data = mice.pctchg.12, method = use.method)$pvalue
+  p.pctchg.adl.wt.12 <- pool.compare(mod.list[['pctchg.adl.wt.12']], ref.adl.wt.12,
+                                     data = mice.pctchg.12, method = use.method)$pvalue
+
+  ## FAQ ##
+  p.mean.faq.nowt.3 <- pool.compare(mod.list[['mean.faq.nowt.3']], ref.faq.nowt.3,
+                                    data = mice.mean.3, method = use.method)$pvalue
+  p.mean.faq.wt.3 <- pool.compare(mod.list[['mean.faq.wt.3']], ref.faq.wt.3,
+                                  data = mice.mean.3, method = use.method)$pvalue
+  p.mean.faq.nowt.12 <- pool.compare(mod.list[['mean.faq.nowt.12']], ref.faq.nowt.12,
+                                     data = mice.mean.12, method = use.method)$pvalue
+  p.mean.faq.wt.12 <- pool.compare(mod.list[['mean.faq.wt.12']], ref.faq.wt.12,
+                                   data = mice.mean.12, method = use.method)$pvalue
+  p.first.faq.nowt.3 <- pool.compare(mod.list[['first.faq.nowt.3']], ref.faq.nowt.3,
+                                     data = mice.first.3, method = use.method)$pvalue
+  p.first.faq.wt.3 <- pool.compare(mod.list[['first.faq.wt.3']], ref.faq.wt.3,
+                                   data = mice.first.3, method = use.method)$pvalue
+  p.first.faq.nowt.12 <- pool.compare(mod.list[['first.faq.nowt.12']], ref.faq.nowt.12,
+                                      data = mice.first.12, method = use.method)$pvalue
+  p.first.faq.wt.12 <- pool.compare(mod.list[['first.faq.wt.12']], ref.faq.wt.12,
+                                    data = mice.first.12, method = use.method)$pvalue
+  p.pctchg.faq.nowt.3 <- pool.compare(mod.list[['pctchg.faq.nowt.3']], ref.faq.nowt.3,
+                                      data = mice.pctchg.3, method = use.method)$pvalue
+  p.pctchg.faq.wt.3 <- pool.compare(mod.list[['pctchg.faq.wt.3']], ref.faq.wt.3,
+                                    data = mice.pctchg.3, method = use.method)$pvalue
+  p.pctchg.faq.nowt.12 <- pool.compare(mod.list[['pctchg.faq.nowt.12']], ref.faq.nowt.12,
+                                       data = mice.pctchg.12, method = use.method)$pvalue
+  p.pctchg.faq.wt.12 <- pool.compare(mod.list[['pctchg.faq.wt.12']], ref.faq.wt.12,
+                                     data = mice.pctchg.12, method = use.method)$pvalue
+
+  return(list('p.mean.adl.nowt.3' = p.mean.adl.nowt.3,
+              'p.mean.adl.wt.3' = p.mean.adl.wt.3,
+              'p.mean.adl.nowt.12' = p.mean.adl.nowt.12,
+              'p.mean.adl.wt.12' = p.mean.adl.wt.12,
+              'p.first.adl.nowt.3' = p.first.adl.nowt.3,
+              'p.first.adl.wt.3' = p.first.adl.wt.3,
+              'p.first.adl.nowt.12' = p.first.adl.nowt.12,
+              'p.first.adl.wt.12' = p.first.adl.wt.12,
+              'p.pctchg.adl.nowt.3' = p.pctchg.adl.nowt.3,
+              'p.pctchg.adl.wt.3' = p.pctchg.adl.wt.3,
+              'p.pctchg.adl.nowt.12' = p.pctchg.adl.nowt.12,
+              'p.pctchg.adl.wt.12' = p.pctchg.adl.wt.12,
+              'p.mean.faq.nowt.3' = p.mean.faq.nowt.3,
+              'p.mean.faq.wt.3' = p.mean.faq.wt.3,
+              'p.mean.faq.nowt.12' = p.mean.faq.nowt.12,
+              'p.mean.faq.wt.12' = p.mean.faq.wt.12,
+              'p.first.faq.nowt.3' = p.first.faq.nowt.3,
+              'p.first.faq.wt.3' = p.first.faq.wt.3,
+              'p.first.faq.nowt.12' = p.first.faq.nowt.12,
+              'p.first.faq.wt.12' = p.first.faq.wt.12,
+              'p.pctchg.faq.nowt.3' = p.pctchg.faq.nowt.3,
+              'p.pctchg.faq.wt.3' = p.pctchg.faq.wt.3,
+              'p.pctchg.faq.nowt.12' = p.pctchg.faq.nowt.12,
+              'p.pctchg.faq.wt.12' = p.pctchg.faq.wt.12))
+}
+
+use.this.method <- 'likelihood'
+
+crp.func.pvals <- func.bio.pvals(mod.list = crp.mods, use.method = use.this.method)
+ifngamma.func.pvals <- func.bio.pvals(mod.list = ifngamma.mods, use.method = use.this.method)
+il10.func.pvals <- func.bio.pvals(mod.list = il10.mods, use.method = use.this.method)
+il12.func.pvals <- func.bio.pvals(mod.list = il12.mods, use.method = use.this.method)
+il1b.func.pvals <- func.bio.pvals(mod.list = il1b.mods, use.method = use.this.method)
+il6.func.pvals <- func.bio.pvals(mod.list = il6.mods, use.method = use.this.method)
+il8.func.pvals <- func.bio.pvals(mod.list = il8.mods, use.method = use.this.method)
+mmp9.func.pvals <- func.bio.pvals(mod.list = mmp9.mods, use.method = use.this.method)
+proteinc.func.pvals <- func.bio.pvals(mod.list = proteinc.mods, use.method = use.this.method)
+tnfa.func.pvals <- func.bio.pvals(mod.list = tnfa.mods, use.method = use.this.method)
+tnfr1.func.pvals <- func.bio.pvals(mod.list = tnfr1.mods, use.method = use.this.method)
+
+crp.del.func.pvals <- func.bio.pvals(mod.list = crp.del.mods,
+                                     inc.del = TRUE,
+                                     use.method = use.this.method)
+ifngamma.del.func.pvals <- func.bio.pvals(mod.list = ifngamma.del.mods,
+                                          inc.del = TRUE,
+                                          use.method = use.this.method)
+il10.del.func.pvals <- func.bio.pvals(mod.list = il10.del.mods,
+                                      inc.del = TRUE,
+                                      use.method = use.this.method)
+il12.del.func.pvals <- func.bio.pvals(mod.list = il12.del.mods,
+                                      inc.del = TRUE,
+                                      use.method = use.this.method)
+il1b.del.func.pvals <- func.bio.pvals(mod.list = il1b.del.mods,
+                                      inc.del = TRUE,
+                                      use.method = use.this.method)
+il6.del.func.pvals <- func.bio.pvals(mod.list = il6.del.mods,
+                                     inc.del = TRUE,
+                                     use.method = use.this.method)
+il8.del.func.pvals <- func.bio.pvals(mod.list = il8.del.mods,
+                                     inc.del = TRUE,
+                                     use.method = use.this.method)
+mmp9.del.func.pvals <- func.bio.pvals(mod.list = mmp9.del.mods,
+                                      inc.del = TRUE,
+                                      use.method = use.this.method)
+proteinc.del.func.pvals <- func.bio.pvals(mod.list = proteinc.del.mods,
+                                          inc.del = TRUE,
+                                          use.method = use.this.method)
+tnfa.del.func.pvals <- func.bio.pvals(mod.list = tnfa.del.mods,
+                                      inc.del = TRUE,
+                                      use.method = use.this.method)
+tnfr1.del.func.pvals <- func.bio.pvals(mod.list = tnfr1.del.mods,
+                                       inc.del = TRUE,
+                                       use.method = use.this.method)
+
+## -- Need to calculate predicted values by hand ---------------------------------------------------
+## Create design matrix, adjusting all covariates to median or mode
+pred.vars <- intersect(names(crp.mods$mean.adl.nowt.3$analyses[[1]]$coefficients), names(model.data))
+pred.del.vars <- intersect(names(crp.del.mods$mean.adl.nowt.3$analyses[[1]]$coefficients),
+                           names(model.data))
+## All our current covariates are numeric and linear, which is helpful
+pred.vec <- unlist(lapply(pred.vars, FUN = function(predvar){
+  median(model.data[,predvar], na.rm = TRUE)
+}))
+pred.del.vec <- unlist(lapply(pred.del.vars, FUN = function(predvar){
+  median(model.data[,predvar], na.rm = TRUE)
+}))
+
+## Function to, for each row in design matrix, calculate predicted value and SE from pooled results
+calc.funcresults <- function(biomod, pred.vals){
+  coefnames <- names(biomod$analyses[[1]]$coefficients)
+  bioname <- strsplit(coefnames[length(pred.vals) + 2], ')')[[1]][2]
+
+  ## Get unique values of biomarker measure (5th-95th percentiles)
+  biovals <- sort(unique(model.data[,bioname]))
+  bioknots <- rcspline.eval(biovals, nk = 3, knots.only = TRUE)
+  biovals <- biovals[biovals >= bioknots[1] & biovals <= bioknots[3]]
+
+  ## Create full design matrix: same values for all covariates;
+  ##  differs in biomarker and nonlinear biomarker terms
+  designmat <-
+    do.call(rbind,
+            lapply(biovals, FUN = function(x){
+              c(1, pred.vals, x,
+                calc.spline(x, k1 = bioknots[1], k2 = bioknots[2], k3 = bioknots[3]))
+            }))
+
+  ## Pool model results, get coefficients and vcov matrix
+  pooled.mod <- pool(biomod)
+  pooled.coefs <- pooled.mod$qbar
+  pooled.vcov <- pooled.mod$ubar
+
+  ## Calculate linear predictors and their SEs
+  lp <- apply(designmat, MARGIN = 1, FUN = function(x){ sum(pooled.coefs * as.numeric(x)) })
+  lp.se <- apply(designmat, MARGIN = 1, FUN = function(x){ sqrt(t(x) %*% pooled.vcov %*% x) })
+
+  ## Calculate LCL, UCLs for linear predictors
+  lp.lcl <- lp - qnorm(0.975)*lp.se
+  lp.ucl <- lp + qnorm(0.975)*lp.se
+
+  ## Calculate predicted counts, CIs as exp(quantities)
+  count.pe <- exp(lp)
+  count.lcl <- exp(lp.lcl)
+  count.ucl <- exp(lp.ucl)
+
+  ## Bind all results into data frame for plotting
+  return(as.data.frame(cbind(biovals, lp, lp.se, count.pe, count.lcl, count.ucl)))
+}
+
 @
 
 <<getresults>>=
@@ -1195,8 +1416,8 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
   ##    no weights/weights at 12 months
   results.data <- results.data %>%
     separate(which.mod, into = c('measure', 'test', 'weight', 'time')) %>%
-    mutate(measure.str = ifelse(measure == 'first', 'First',
-                         ifelse(measure == 'mean', 'Mean', '\\% Change')),
+    mutate(measure.str = ifelse(measure == 'first', 'Log10(First)',
+                         ifelse(measure == 'mean', 'Log10(Mean)', '\\% Change')),
            low = rndformat(low),
            high = rndformat(high),
            mod.type = paste(weight, time, sep = '.'),
@@ -1327,17 +1548,18 @@ latex.results <- function(resultsdata, markerstr, teststr){
 # summary(test2.wt)
 # summary(il10.mods$pctchg.trailb.wt.12)
 
-## Function to plot results from a model, weighted and non-weighted on the same panel
+## Functions to plot results from a model, weighted and non-weighted on the same panel -------------
 test.ylabs <- data.frame(testvar = c('rbans', 'trailb', 'adl', 'faq'),
                          testylab = c('Adjusted RBANS Global Score',
                                       'Adjusted Trails B T-Score',
-                                      'Adjusted Prob. of Higher ADL Score',
-                                      'Adjusted Prob. of Higher FAQ Score'))
+                                      'Adjusted ADL Score',
+                                      'Adjusted FAQ Score'))
 
-plot.test.results <- function(modlist, ## List of model objects (eg, crp.mods)
-                              test = c('rbans', 'trailb', 'adl', 'faq'), ## Test of interest
-                              marker, ## String; biomarker prefix (eg, 'crp')
-                              xlab.addon = NULL){ ## Text to add on to X label (eg, "Models Without Delirium")
+## Cognitive outcomes (linear models)
+cogresults.plot <- function(modlist, ## List of model objects (eg, crp.mods)
+                            test = c('rbans', 'trailb'), ## Test of interest
+                            marker, ## String; biomarker prefix (eg, 'crp')
+                            xlab.addon = NULL){ ## Text added to X label (eg "Models Without Delirium")
 
   ## For all models in modlist which involve test of interest, get predicted values;
   ##  bind all predicted values in single data set, adding model name (eg,
@@ -1362,7 +1584,7 @@ plot.test.results <- function(modlist, ## List of model objects (eg, crp.mods)
     separate(modtype, into = c('measure', 'test', 'weight', 'time')) %>%
     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
                                ifelse(measure == 'first', 2, 3)),
-                               levels = 1:3, labels = c('Mean', 'First', '% Change')),
+                               levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
            timestr = factor(ifelse(time == 3, 1, 2),
                             levels = 1:2, labels = c('3 Months', '12 Months')))
 
@@ -1393,6 +1615,91 @@ plot.test.results <- function(modlist, ## List of model objects (eg, crp.mods)
           panel.margin = unit(0.5, 'lines'))
 
   return(marker.plot)
+}
+
+## Functional outcomes (negative binomial models)
+funcresults.plot <- function(modlist,
+                             plist,
+                             test = c('adl', 'faq'),
+                             marker,
+                             xlab.addon = NULL){
+
+  ## Create data frame of p-value strings to add to each plot
+  p.data <- data.frame(modtype = names(plist),
+                       pval = as.numeric(plist))
+  p.data <- p.data[p.data$modtype %in% grep(test, p.data$modtype, value = TRUE),] %>%
+    ## Separate model name variable into pieces and use to create factors for plotting
+    separate(modtype, into = c('p', 'measure', 'test', 'weight', 'time')) %>%
+    mutate(measurestr = factor(ifelse(measure == 'mean', 1,
+                               ifelse(measure == 'first', 2, 3)),
+                               levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
+           timestr = factor(ifelse(time == 3, 1, 2),
+                            levels = 1:2, labels = c('3 Months', '12 Months'))) %>%
+    dplyr::select(-p, -measure, -test) %>%
+    spread(key = weight, value = pval) %>%
+    mutate(pval.string = paste0('Unweighted p: ', formatp(nowt),
+                                '\nWeighted p: ', formatp(wt)))
+
+  ## For all models in modlist which involve test of interest, get predicted values;
+  ##  bind all predicted values in single data set, adding model name (eg,
+  ##  mean.rbans.nowt.3) as variable
+
+  ## Is delirium included in model?
+  if(length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0){
+    use.pred.vals <- pred.del.vec
+  } else{
+    use.pred.vals <- pred.vec
+  }
+
+  pred.data <- bind_rows(lapply(grep(test, names(modlist)), FUN = function(x){
+    tmp <- calc.funcresults(modlist[[x]], use.pred.vals)
+    tmp$modtype <- names(modlist)[x]
+    tmp
+  })) %>%
+    ## Separate model name variable into pieces and use to create factors for plotting
+    separate(modtype, into = c('measure', 'test', 'weight', 'time')) %>%
+    mutate(measurestr = factor(ifelse(measure == 'mean', 1,
+                               ifelse(measure == 'first', 2, 3)),
+                               levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
+           timestr = factor(ifelse(time == 3, 1, 2),
+                            levels = 1:2, labels = c('3 Months', '12 Months')))
+
+  ## Get X and Y values from pred.data for adding p-value text, add to p.data
+  xvals <- group_by(pred.data, measurestr) %>% summarise(x.val = max(biovals))
+  p.data <- p.data %>% left_join(xvals, by = 'measurestr') %>%
+    mutate(y.val = max(pred.data$count.ucl, na.rm = TRUE))
+
+  ## Create X label string
+  if(is.null(xlab.addon)){
+    use.xlab <- paste('Measure of', toupper(marker))
+  } else{
+    use.xlab <- paste0('Measure of ', toupper(marker), ', ', xlab.addon)
+  }
+
+
+  ## Plot, with biomarker measures as columns and time points as rows
+  marker.plot <- ggplot(aes(x = biovals), data = pred.data) +
+    facet_grid(timestr ~ measurestr, scales = 'free_x') +
+    geom_ribbon(aes(ymin = count.lcl, ymax = count.ucl, fill = weight), alpha = 0.4) +
+    geom_line(aes(y = count.pe, colour = weight)) +
+    geom_text(aes(x = x.val, y = y.val, label = pval.string),
+              data = p.data, fontface = 'bold', hjust = 1, vjust = 1, size = 2) +
+    scale_colour_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
+    scale_fill_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
+    xlab(use.xlab) +
+    ylab(test.ylabs[match(test, test.ylabs$testvar), 'testylab']) +
+    theme_bw() +
+    theme(legend.position = 'bottom',
+          legend.key.size = unit(0.25, "cm"),
+          legend.text = element_text(size = 8),
+          axis.ticks = element_line(colour = 'grey50'),
+          axis.text = element_text(size = 8),
+          axis.title.x = element_text(vjust = 0),
+          strip.background = element_blank(),
+          panel.margin = unit(0.5, 'lines'))
+
+  return(marker.plot)
+
 }
 
 @
@@ -1435,14 +1742,10 @@ latex.results(crp.del.rbans.results, 'CRP', 'RBANS Global Scores, Models With De
 
 \clearpage
 <<printcrprbansplots, results='asis', fig.cap = 'CRP vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = crp.mods,
-                            test = 'rbans',
-                            marker = 'crp',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = crp.del.mods,
-                            test = 'rbans',
-                            marker = 'crp',
-                            xlab.addon = 'Models With Delirium'),
+multiplot(cogresults.plot(modlist = crp.mods, test = 'rbans', marker = 'crp',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = crp.del.mods, test = 'rbans', marker = 'crp',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1456,14 +1759,10 @@ latex.results(crp.del.trailb.results, 'CRP', 'Trails B T-Scores, Models With Del
 
 \clearpage
 <<printcrptrailbplots, results='asis', fig.cap = 'CRP vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = crp.mods,
-                            test = 'trailb',
-                            marker = 'crp',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = crp.del.mods,
-                            test = 'trailb',
-                            marker = 'crp',
-                            xlab.addon = 'Models With Delirium'),
+multiplot(cogresults.plot(modlist = crp.mods, test = 'trailb', marker = 'crp',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = crp.del.mods, test = 'trailb', marker = 'crp',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1477,15 +1776,11 @@ latex.results(ifngamma.del.rbans.results, 'ifngamma', 'RBANS Global Scores, Mode
 @
 
 \clearpage
-<<printifngammarbansplots, results='asis', fig.cap = 'ifngamma vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = ifngamma.mods,
-                            test = 'rbans',
-                            marker = 'ifngamma',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = ifngamma.del.mods,
-                            test = 'rbans',
-                            marker = 'ifngamma',
-                            xlab.addon = 'Models With Delirium'),
+<<printifngammarbansplots, results='asis', fig.cap = 'IFN-gamma vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = ifngamma.mods, test = 'rbans', marker = 'ifngamma',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = ifngamma.del.mods, test = 'rbans', marker = 'ifngamma',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1498,15 +1793,11 @@ latex.results(ifngamma.del.trailb.results, 'IFN-gamma', 'Trails B T-Scores, Mode
 @
 
 \clearpage
-<<printifngammatrailbplots, results='asis', fig.cap = 'ifngamma vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = ifngamma.mods,
-                            test = 'trailb',
-                            marker = 'ifngamma',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = ifngamma.del.mods,
-                            test = 'trailb',
-                            marker = 'ifngamma',
-                            xlab.addon = 'Models With Delirium'),
+<<printifngammatrailbplots, results='asis', fig.cap = 'IFN-gamma vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = ifngamma.mods, test = 'trailb', marker = 'ifngamma',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = ifngamma.del.mods, test = 'trailb', marker = 'ifngamma',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1520,15 +1811,11 @@ latex.results(il10.del.rbans.results, 'IL-10', 'RBANS Global Scores, Models With
 @
 
 \clearpage
-<<printil10rbansplots, results='asis', fig.cap = 'il10 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il10.mods,
-                            test = 'rbans',
-                            marker = 'il10',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il10.del.mods,
-                            test = 'rbans',
-                            marker = 'il10',
-                            xlab.addon = 'Models With Delirium'),
+<<printil10rbansplots, results='asis', fig.cap = 'IL-10 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il10.mods, test = 'rbans', marker = 'il10',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il10.del.mods, test = 'rbans', marker = 'il10',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1541,15 +1828,11 @@ latex.results(il10.del.trailb.results, 'il10', 'Trails B T-Scores, Models With D
 @
 
 \clearpage
-<<printil10trailbplots, results='asis', fig.cap = 'il10 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il10.mods,
-                            test = 'trailb',
-                            marker = 'il10',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il10.del.mods,
-                            test = 'trailb',
-                            marker = 'il10',
-                            xlab.addon = 'Models With Delirium'),
+<<printil10trailbplots, results='asis', fig.cap = 'IL-10 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il10.mods, test = 'trailb', marker = 'il10',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il10.del.mods, test = 'trailb', marker = 'il10',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1563,15 +1846,11 @@ latex.results(il12.del.rbans.results, 'IL-12', 'RBANS Global Scores, Models With
 @
 
 \clearpage
-<<printil12rbansplots, results='asis', fig.cap = 'il12 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il12.mods,
-                            test = 'rbans',
-                            marker = 'il12',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il12.del.mods,
-                            test = 'rbans',
-                            marker = 'il12',
-                            xlab.addon = 'Models With Delirium'),
+<<printil12rbansplots, results='asis', fig.cap = 'IL-12 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il12.mods, test = 'rbans', marker = 'il12',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il12.del.mods, test = 'rbans', marker = 'il12',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1584,15 +1863,11 @@ latex.results(il12.del.trailb.results, 'IL-12', 'Trails B T-Scores, Models With 
 @
 
 \clearpage
-<<printil12trailbplots, results='asis', fig.cap = 'il12 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il12.mods,
-                            test = 'trailb',
-                            marker = 'il12',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il12.del.mods,
-                            test = 'trailb',
-                            marker = 'il12',
-                            xlab.addon = 'Models With Delirium'),
+<<printil12trailbplots, results='asis', fig.cap = 'IL-12 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il12.mods, test = 'trailb', marker = 'il12',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il12.del.mods, test = 'trailb', marker = 'il12',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1606,15 +1881,11 @@ latex.results(il1b.del.rbans.results, 'IL-1b', 'RBANS Global Scores, Models With
 @
 
 \clearpage
-<<printil1brbansplots, results='asis', fig.cap = 'il1b vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il1b.mods,
-                            test = 'rbans',
-                            marker = 'il1b',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il1b.del.mods,
-                            test = 'rbans',
-                            marker = 'il1b',
-                            xlab.addon = 'Models With Delirium'),
+<<printil1brbansplots, results='asis', fig.cap = 'IL1b vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il1b.mods, test = 'rbans', marker = 'il1b',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il1b.del.mods, test = 'rbans', marker = 'il1b',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1627,15 +1898,11 @@ latex.results(il1b.del.trailb.results, 'IL-1b', 'Trails B T-Scores, Models With 
 @
 
 \clearpage
-<<printil1btrailbplots, results='asis', fig.cap = 'il1b vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il1b.mods,
-                            test = 'trailb',
-                            marker = 'il1b',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il1b.del.mods,
-                            test = 'trailb',
-                            marker = 'il1b',
-                            xlab.addon = 'Models With Delirium'),
+<<printil1btrailbplots, results='asis', fig.cap = 'IL1b vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il1b.mods, test = 'trailb', marker = 'il1b',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il1b.del.mods, test = 'trailb', marker = 'il1b',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1649,15 +1916,11 @@ latex.results(il6.del.rbans.results, 'IL-6', 'RBANS Global Scores, Models With D
 @
 
 \clearpage
-<<printil6rbansplots, results='asis', fig.cap = 'il6 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il6.mods,
-                            test = 'rbans',
-                            marker = 'il6',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il6.del.mods,
-                            test = 'rbans',
-                            marker = 'il6',
-                            xlab.addon = 'Models With Delirium'),
+<<printil6rbansplots, results='asis', fig.cap = 'IL-6 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il6.mods, test = 'rbans', marker = 'il6',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il6.del.mods, test = 'rbans', marker = 'il6',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1670,15 +1933,11 @@ latex.results(il6.del.trailb.results, 'IL-6', 'Trails B T-Scores, Models With De
 @
 
 \clearpage
-<<printil6trailbplots, results='asis', fig.cap = 'il6 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il6.mods,
-                            test = 'trailb',
-                            marker = 'il6',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il6.del.mods,
-                            test = 'trailb',
-                            marker = 'il6',
-                            xlab.addon = 'Models With Delirium'),
+<<printil6trailbplots, results='asis', fig.cap = 'IL-6 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il6.mods, test = 'trailb', marker = 'il6',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il6.del.mods, test = 'trailb', marker = 'il6',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1692,15 +1951,11 @@ latex.results(il8.del.rbans.results, 'IL-8', 'RBANS Global Scores, Models With D
 @
 
 \clearpage
-<<printil8rbansplots, results='asis', fig.cap = 'il8 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il8.mods,
-                            test = 'rbans',
-                            marker = 'il8',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il8.del.mods,
-                            test = 'rbans',
-                            marker = 'il8',
-                            xlab.addon = 'Models With Delirium'),
+<<printil8rbansplots, results='asis', fig.cap = 'IL-8 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il8.mods, test = 'rbans', marker = 'il8',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il8.del.mods, test = 'rbans', marker = 'il8',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1713,15 +1968,11 @@ latex.results(il8.del.trailb.results, 'IL-8', 'Trails B T-Scores, Models With De
 @
 
 \clearpage
-<<printil8trailbplots, results='asis', fig.cap = 'il8 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = il8.mods,
-                            test = 'trailb',
-                            marker = 'il8',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = il8.del.mods,
-                            test = 'trailb',
-                            marker = 'il8',
-                            xlab.addon = 'Models With Delirium'),
+<<printil8trailbplots, results='asis', fig.cap = 'IL-8 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = il8.mods, test = 'trailb', marker = 'il8',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = il8.del.mods, test = 'trailb', marker = 'il8',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1735,15 +1986,11 @@ latex.results(mmp9.del.rbans.results, 'MMP9', 'RBANS Global Scores, Models With 
 @
 
 \clearpage
-<<printmmp9rbansplots, results='asis', fig.cap = 'mmp9 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = mmp9.mods,
-                            test = 'rbans',
-                            marker = 'mmp9',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = mmp9.del.mods,
-                            test = 'rbans',
-                            marker = 'mmp9',
-                            xlab.addon = 'Models With Delirium'),
+<<printmmp9rbansplots, results='asis', fig.cap = 'MMP9 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = mmp9.mods, test = 'rbans', marker = 'mmp9',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = mmp9.del.mods, test = 'rbans', marker = 'mmp9',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1756,19 +2003,14 @@ latex.results(mmp9.del.trailb.results, 'MMP9', 'Trails B T-Scores, Models With D
 @
 
 \clearpage
-<<printmmp9trailbplots, results='asis', fig.cap = 'mmp9 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = mmp9.mods,
-                            test = 'trailb',
-                            marker = 'mmp9',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = mmp9.del.mods,
-                            test = 'trailb',
-                            marker = 'mmp9',
-                            xlab.addon = 'Models With Delirium'),
+<<printmmp9trailbplots, results='asis', fig.cap = 'MMP9 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = mmp9.mods, test = 'trailb', marker = 'mmp9',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = mmp9.del.mods, test = 'trailb', marker = 'mmp9',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
-
 \clearpage
 \subsection{Protein C}
 \subsubsection{RBANS}
@@ -1778,15 +2020,11 @@ latex.results(proteinc.del.rbans.results, 'Protein c', 'RBANS Global Scores, Mod
 @
 
 \clearpage
-<<printproteincrbansplots, results='asis', fig.cap = 'proteinc vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = proteinc.mods,
-                            test = 'rbans',
-                            marker = 'proteinc',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = proteinc.del.mods,
-                            test = 'rbans',
-                            marker = 'proteinc',
-                            xlab.addon = 'Models With Delirium'),
+<<printproteincrbansplots, results='asis', fig.cap = 'Protein C vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = proteinc.mods, test = 'rbans', marker = 'proteinc',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = proteinc.del.mods, test = 'rbans', marker = 'proteinc',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1799,15 +2037,11 @@ latex.results(proteinc.del.trailb.results, 'Protein C', 'Trails B T-Scores, Mode
 @
 
 \clearpage
-<<printproteinctrailbplots, results='asis', fig.cap = 'proteinc vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = proteinc.mods,
-                            test = 'trailb',
-                            marker = 'proteinc',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = proteinc.del.mods,
-                            test = 'trailb',
-                            marker = 'proteinc',
-                            xlab.addon = 'Models With Delirium'),
+<<printproteinctrailbplots, results='asis', fig.cap = 'Protein C vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = proteinc.mods, test = 'trailb', marker = 'proteinc',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = proteinc.del.mods, test = 'trailb', marker = 'proteinc',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1821,15 +2055,11 @@ latex.results(tnfa.del.rbans.results, 'TNF-alpha', 'RBANS Global Scores, Models 
 @
 
 \clearpage
-<<printtnfarbansplots, results='asis', fig.cap = 'tnfa vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = tnfa.mods,
-                            test = 'rbans',
-                            marker = 'tnfa',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = tnfa.del.mods,
-                            test = 'rbans',
-                            marker = 'tnfa',
-                            xlab.addon = 'Models With Delirium'),
+<<printtnfarbansplots, results='asis', fig.cap = 'TNF-alpha vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = tnfa.mods, test = 'rbans', marker = 'tnfa',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = tnfa.del.mods, test = 'rbans', marker = 'tnfa',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1842,15 +2072,11 @@ latex.results(tnfa.del.trailb.results, 'TNF-alpha', 'Trails B T-Scores, Models W
 @
 
 \clearpage
-<<printtnfatrailbplots, results='asis', fig.cap = 'tnfa vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = tnfa.mods,
-                            test = 'trailb',
-                            marker = 'tnfa',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = tnfa.del.mods,
-                            test = 'trailb',
-                            marker = 'tnfa',
-                            xlab.addon = 'Models With Delirium'),
+<<printtnfatrailbplots, results='asis', fig.cap = 'TNF-alpha vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = tnfa.mods, test = 'trailb', marker = 'tnfa',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = tnfa.del.mods, test = 'trailb', marker = 'tnfa',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1864,15 +2090,11 @@ latex.results(tnfr1.del.rbans.results, 'TNFR1', 'RBANS Global Scores, Models Wit
 @
 
 \clearpage
-<<printtnfr1rbansplots, results='asis', fig.cap = 'tnfr1 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = tnfr1.mods,
-                            test = 'rbans',
-                            marker = 'tnfr1',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = tnfr1.del.mods,
-                            test = 'rbans',
-                            marker = 'tnfr1',
-                            xlab.addon = 'Models With Delirium'),
+<<printtnfr1rbansplots, results='asis', fig.cap = 'TNFR1 vs. RBANS Global Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = tnfr1.mods, test = 'rbans', marker = 'tnfr1',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = tnfr1.del.mods, test = 'rbans', marker = 'tnfr1',
+                          xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
@@ -1885,15 +2107,292 @@ latex.results(tnfr1.del.trailb.results, 'TNFR1', 'Trails B T-Scores, Models With
 @
 
 \clearpage
-<<printtnfr1trailbplots, results='asis', fig.cap = 'tnfr1 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
-multiplot(plot.test.results(modlist = tnfr1.mods,
-                            test = 'trailb',
-                            marker = 'tnfr1',
-                            xlab.addon = 'Models Without Delirium'),
-          plot.test.results(modlist = tnfr1.del.mods,
-                            test = 'trailb',
-                            marker = 'tnfr1',
-                            xlab.addon = 'Models With Delirium'),
+<<printtnfr1trailbplots, results='asis', fig.cap = 'TNFR1 vs. Trails B T-Scores', fig.align = 'center', fig.width = 10, fig.height = 7.5, fig.pos = '!h'>>=
+multiplot(cogresults.plot(modlist = tnfr1.mods, test = 'trailb', marker = 'tnfr1',
+                          xlab.addon = 'Models Without Delirium'),
+          cogresults.plot(modlist = tnfr1.del.mods, test = 'trailb', marker = 'tnfr1',
+                          xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\section{Biomarkers vs. Long-Term Functional Outcomes}
+We used negative binomial regression to examine the relationships between biomarkers, measured
+three different ways, and Katz ADL and FAQ scores at 3- and 12-month followup. P-values are
+calculated using the likelihood method, comparing models with the biomarker terms to models without
+those terms (but including all other covariates).
+
+Models are performed using multiple imputation; all patients who had at least partial functional
+testing data at a given time point are included in the models. All models included the following
+covariates; all covariates are forced to be linear except for the biomarkers, which are allowed to
+have a nonlinear relationship with the outcome using restricted cubic splines. Mean and first
+biomarker were transformed by taking the base 10 logarithm, so that extremely high values did not
+cause problems with model convergence.
+
+\begin{itemize}
+\item Age at enrollment
+\item Charlson score
+\item Years of education
+\item IQCODE score at enrollment
+\item ADL score at study enrollment
+\item FAQ score at study enrollment
+\item Mean 24h doses of benzodiazepines (midazolam equivalents), opioids (fentanyl equivalents),
+propofol, dexmedetomidine, and haloperidol in the ICU
+\end{itemize}
+
+We also ran the above models adding delirium as a covariate, to help investigate any potential
+mediation effects from delirium.
+
+\clearpage
+\subsection{CRP}
+\subsubsection{ADL}
+<<printcrpadl, results='asis', fig.cap = 'CRP vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'adl',
+                           marker = 'crp', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'adl',
+                           marker = 'crp', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printcrpfaq, results='asis', fig.cap = 'CRP vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'faq',
+                           marker = 'crp', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'faq',
+                           marker = 'crp', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{IFN-$\gamma$}
+\subsubsection{ADL}
+<<printifngammaadl, results='asis', fig.cap = 'IFN-gamma vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'adl',
+                           marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
+                           test = 'adl', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printifngammafaq, results='asis', fig.cap = 'IFN-gamma vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'faq',
+                           marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
+                           test = 'faq', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{IL-10}
+\subsubsection{ADL}
+<<printil10adl, results='asis', fig.cap = 'IL-10 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'adl',
+                           marker = 'il10', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'adl',
+                           marker = 'il10', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printil10faq, results='asis', fig.cap = 'IL-10 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'faq',
+                           marker = 'il10', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'faq',
+                           marker = 'il10', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{IL-12}
+\subsubsection{ADL}
+<<printil12adl, results='asis', fig.cap = 'IL-12 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 'adl',
+                           marker = 'il12', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il12.del.mods, plist = il12.del.func.pvals, test = 'adl',
+                           marker = 'il12', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printil12faq, results='asis', fig.cap = 'IL-12 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 'faq',
+                           marker = 'il12', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il12.del.mods, plist = il12.del.func.pvals, test = 'faq',
+                           marker = 'il12', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{IL-1$\beta$}
+\subsubsection{ADL}
+<<printil1badl, results='asis', fig.cap = 'IL1b vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'adl',
+                           marker = 'il1b', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'adl',
+                           marker = 'il1b', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printil1bfaq, results='asis', fig.cap = 'IL1b vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'faq',
+                           marker = 'il1b', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'faq',
+                           marker = 'il1b', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{IL-6}
+\subsubsection{ADL}
+<<printil6adl, results='asis', fig.cap = 'IL-6 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'adl',
+                           marker = 'il6', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'adl',
+                           marker = 'il6', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printil6faq, results='asis', fig.cap = 'IL-6 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'faq',
+                           marker = 'il6', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'faq',
+                           marker = 'il6', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{IL-8}
+\subsubsection{ADL}
+<<printil8adl, results='asis', fig.cap = 'IL-8 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'adl',
+                           marker = 'il8', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'adl',
+                           marker = 'il8', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printil8faq, results='asis', fig.cap = 'IL-8 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'faq',
+                           marker = 'il8', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'faq',
+                           marker = 'il8', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{MMP9}
+\subsubsection{ADL}
+<<printmmp9adl, results='asis', fig.cap = 'MMP9 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'adl',
+                           marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'adl',
+                           marker = 'mmp9', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printmmp9faq, results='asis', fig.cap = 'MMP9 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'faq',
+                           marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'faq',
+                           marker = 'mmp9', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{Protein C}
+\subsubsection{ADL}
+<<printproteincadl, results='asis', fig.cap = 'Protein C vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'adl',
+                           marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'adl',
+                           marker = 'proteinc', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printproteincfaq, results='asis', fig.cap = 'Protein C vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'faq',
+                           marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'faq',
+                           marker = 'proteinc', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{TNF$\alpha$}
+\subsubsection{ADL}
+<<printtnfaadl, results='asis', fig.cap = 'TNF-alpha vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'adl',
+                           marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'adl',
+                           marker = 'tnfa', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printtnfafaq, results='asis', fig.cap = 'TNF-alpha vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'faq',
+                           marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'faq',
+                           marker = 'tnfa', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsection{TNFR1}
+\subsubsection{ADL}
+<<printtnfr1adl, results='asis', fig.cap = 'TNFR1 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'adl',
+                           marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'adl',
+                           marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\subsubsection{FAQ}
+<<printtnfr1faq, results='asis', fig.cap = 'TNFR1 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'faq',
+                           marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'faq',
+                           marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
 
 @
