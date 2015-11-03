@@ -219,6 +219,10 @@ all.oneobs$func.cohort.3 <-
 all.oneobs$func.cohort.12 <-
   all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.func.data)$id
 
+## Create indicators for whether patient is in each cohort at either time, for Table 1
+all.oneobs$cog.cohort.either <- all.oneobs$cog.cohort.3 | all.oneobs$cog.cohort.12
+all.oneobs$func.cohort.either <- all.oneobs$func.cohort.3 | all.oneobs$func.cohort.12
+
 ## -- Calculate summary values for each biomarker for each patient ----------------------------------
 bio.summary.pt <- all.daily[,c('id', 'study.day', biomarker.vnames)] %>%
   gather(key = bio.marker, value = bio.value, crp.imp:tnfr1.imp) %>%
@@ -359,6 +363,73 @@ label(model.data$trail.b.tscore.12) <- 'Trails B T-score, 12m'
 
 @
 
+<<desctables>>=
+desc.data <- all.oneobs %>% left_join(model.fu.data, by = 'id')
+
+desc.vars <- c('age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqcode.score.e',
+               'stroke.risk', 'adl.e', 'faq.e', 'frailty', 'mean.benz.icu', 'mean.op.new.icu',
+               'mean.prop.icu', 'mean.dex.icu', 'mean.hal.icu', 'ever.vent.s', 'vent.los.tot.eo',
+               'ever.del.s.imp', 'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo',
+               'rbans.global.score.3', 'rbans.global.score.12', 'trail.b.tscore.3',
+               'trail.b.tscore.12', 'adl.totscore.3', 'adl.totscore.12', 'faq.totscore.3',
+               'faq.totscore.12')
+
+desc.data.all <-
+  desc.data[desc.data$id %nin%
+              subset(all.oneobs, studywd.amt %in% c('2. W/D from Participation and All Data Collected',
+                                                    '4. N/A Study Staff Withdrew Patient'))$id,
+            desc.vars]
+desc.data.all$cohort <- 1
+desc.data.cog <- desc.data[desc.data$cog.cohort.either, desc.vars]
+desc.data.cog$cohort <- 2
+desc.data.func <- desc.data[desc.data$func.cohort.either, desc.vars]
+desc.data.func$cohort <- 3
+
+desc.data.all <- rbind(desc.data.all, desc.data.cog, desc.data.func)
+desc.data.all$cohort <- factor(desc.data.all$cohort,
+                               levels = 1:3,
+                               labels = c('All Patients',
+                                          'In Cognitive Outcomes Cohort',
+                                          'In Functional Outcomes Cohort'))
+
+label(desc.data.all$sex.pp) = 'Sex'
+label(desc.data.all$race.pp) = 'Race'
+label(desc.data.all$frailty) = 'CSHA Frailty at enrollment'
+label(desc.data.all$mean.benz.icu) = 'Mean 24h benzos in ICU (MDZ equivalents)'
+label(desc.data.all$mean.op.new.icu) = 'Mean 24h opioids in ICU (fentanyl equivalents)'
+label(desc.data.all$mean.prop.icu) = 'Mean 24h propofol in ICU'
+label(desc.data.all$mean.dex.icu) = 'Mean 24h dex in ICU'
+label(desc.data.all$mean.hal.icu) = 'Mean 24h haldol in ICU'
+label(desc.data.all$ever.vent.s) = 'On vent during study period'
+label(desc.data.all$ever.del.s.imp) = 'Delirious during study period'
+label(desc.data.all$ever.coma.s.imp) = 'Comatose during study period'
+label(desc.data.all$rbans.global.score.3) = 'RBANS global score, 3m'
+label(desc.data.all$rbans.global.score.12) = 'RBANS global score, 12m'
+label(desc.data.all$trail.b.tscore.3) = 'Trails B T-score, 3m'
+label(desc.data.all$trail.b.tscore.12) = 'Trails B T-score, 12m'
+label(desc.data.all$adl.totscore.3) = 'Katz ADL score, 3m'
+label(desc.data.all$adl.totscore.12) = 'Katz ADL score, 12m'
+label(desc.data.all$faq.totscore.3) = 'FAQ score, 3m'
+label(desc.data.all$faq.totscore.12) = 'FAQ score, 12m'
+
+@
+\end{landscape}
+
+<<printdescstats, results='asis'>>=
+latex(summaryM(formula(paste(paste(desc.vars, collapse = ' + '), '~ cohort')), data = desc.data.all),
+      file = '',
+      digits = 2,
+      prn = FALSE,
+      what = '%',
+      npct = 'both',
+      exclude1 = FALSE,
+      landscape = TRUE,
+      size = 'small',
+      prmsd = TRUE)
+
+@
+
+\begin{landscape}
 <<weighthist, results='asis', fig.cap='Histogram of Model Weights by Analysis Cohort', fig.align='center', fig.pos='!h', fig.width=10, fig.height=3>>=
 ## -- Create histograms for inverse probability weights, showing total N in each cohort ------------
 ## Data frame including variable names and axis labels to use in histograms
