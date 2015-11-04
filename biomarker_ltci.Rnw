@@ -182,20 +182,6 @@ the specified time point (including any RBANS domains, Trails A, Trails B and/or
 are included in the functional cohort if they had at least one functional test performed at the
 specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA frailty).
 
-\section{Model Weighting}
-Each model is performed on all survivors in the followup cohort of interest. In order to address
-selection bias from survival and attrition - i.e., the fact that patients who are alive and have
-long-term followup data are likely different than patients who do not - we also added inverse
-probability weights to each model in a second version. These weights are calculated by modeling the
-probability that each patient in the original in-hospital cohort contributes to each followup
-cohort, then taking the inverse of this estimated weight. In our weighting mdoels, we included age;
-Charlson score; education; IQCODE; Framingham stroke risk score; mean 24-hour doses of
-benzodiazepines, opioids, propofol, dexmedetomidine, and haloperidol (cube root transformed);
-duration of severe sepsis, delirium, and coma; and mean modified SOFA.
-
-Figure \ref{fig:weighthist} shows the distribution of these inverse probability weights and the
-number of patients included in the final cohorts.
-
 <<datamgmt>>=
 ## -- Indicators for whether each patient is in cognitive or functional analysis cohort at each time
 ## Create vectors of tests included in "partial data" criteria at each time point for each cohort
@@ -367,9 +353,10 @@ label(model.data$trail.b.tscore.12) <- 'Trails B T-score, 12m'
 desc.data <- all.oneobs %>% left_join(model.fu.data, by = 'id')
 
 desc.vars <- c('age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqcode.score.e',
-               'stroke.risk', 'adl.e', 'faq.e', 'frailty', 'mean.benz.icu', 'mean.op.new.icu',
-               'mean.prop.icu', 'mean.dex.icu', 'mean.hal.icu', 'ever.vent.s', 'vent.los.tot.eo',
-               'ever.del.s.imp', 'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo',
+               'stroke.risk', 'adl.e', 'faq.e', 'frailty', 'icu.type', 'num.apache', 'sofa',
+               'mean.benz.icu', 'mean.op.new.icu', 'mean.prop.icu', 'mean.dex.icu',
+               'mean.hal.icu', 'ever.vent.s', 'vent.los.tot.eo', 'ever.del.s.imp',
+               'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo',
                'rbans.global.score.3', 'rbans.global.score.12', 'trail.b.tscore.3',
                'trail.b.tscore.12', 'adl.totscore.3', 'adl.totscore.12', 'faq.totscore.3',
                'faq.totscore.12')
@@ -378,11 +365,11 @@ desc.data.all <-
   desc.data[desc.data$id %nin%
               subset(all.oneobs, studywd.amt %in% c('2. W/D from Participation and All Data Collected',
                                                     '4. N/A Study Staff Withdrew Patient'))$id,
-            desc.vars]
+            c('admit.dx', desc.vars)]
 desc.data.all$cohort <- 1
-desc.data.cog <- desc.data[desc.data$cog.cohort.either, desc.vars]
+desc.data.cog <- desc.data[desc.data$cog.cohort.either, c('admit.dx', desc.vars)]
 desc.data.cog$cohort <- 2
-desc.data.func <- desc.data[desc.data$func.cohort.either, desc.vars]
+desc.data.func <- desc.data[desc.data$func.cohort.either, c('admit.dx', desc.vars)]
 desc.data.func$cohort <- 3
 
 desc.data.all <- rbind(desc.data.all, desc.data.cog, desc.data.func)
@@ -395,6 +382,10 @@ desc.data.all$cohort <- factor(desc.data.all$cohort,
 label(desc.data.all$sex.pp) = 'Sex'
 label(desc.data.all$race.pp) = 'Race'
 label(desc.data.all$frailty) = 'CSHA Frailty at enrollment'
+label(desc.data.all$sofa) = 'SOFA at ICU admission'
+label(desc.data.all$num.apache) = 'APACHE II at ICU admission'
+label(desc.data.all$icu.type) = 'ICU type'
+label(desc.data.all$admit.dx) = 'Primary admission diagnosis'
 label(desc.data.all$mean.benz.icu) = 'Mean 24h benzos in ICU (MDZ equivalents)'
 label(desc.data.all$mean.op.new.icu) = 'Mean 24h opioids in ICU (fentanyl equivalents)'
 label(desc.data.all$mean.prop.icu) = 'Mean 24h propofol in ICU'
@@ -424,12 +415,37 @@ latex(summaryM(formula(paste(paste(desc.vars, collapse = ' + '), '~ cohort')), d
       npct = 'both',
       exclude1 = FALSE,
       landscape = TRUE,
+      size = 'footnotesize',
+      prmsd = TRUE)
+
+latex(summaryM(admit.dx ~ cohort, data = desc.data.all),
+      file = '',
+      digits = 2,
+      prn = FALSE,
+      what = '%',
+      npct = 'both',
+      exclude1 = FALSE,
+      landscape = TRUE,
       size = 'small',
       prmsd = TRUE)
 
 @
 
 \begin{landscape}
+\section{Model Weighting}
+Each model is performed on all survivors in the followup cohort of interest. In order to address
+selection bias from survival and attrition - i.e., the fact that patients who are alive and have
+long-term followup data are likely different than patients who do not - we also added inverse
+probability weights to each model in a second version. These weights are calculated by modeling the
+probability that each patient in the original in-hospital cohort contributes to each followup
+cohort, then taking the inverse of this estimated weight. In our weighting mdoels, we included age;
+Charlson score; education; IQCODE; Framingham stroke risk score; mean 24-hour doses of
+benzodiazepines, opioids, propofol, dexmedetomidine, and haloperidol (cube root transformed);
+duration of severe sepsis, delirium, and coma; and mean modified SOFA.
+
+Figure \ref{fig:weighthist} shows the distribution of these inverse probability weights and the
+number of patients included in the final cohorts.
+
 <<weighthist, results='asis', fig.cap='Histogram of Model Weights by Analysis Cohort', fig.align='center', fig.pos='!h', fig.width=10, fig.height=3>>=
 ## -- Create histograms for inverse probability weights, showing total N in each cohort ------------
 ## Data frame including variable names and axis labels to use in histograms
