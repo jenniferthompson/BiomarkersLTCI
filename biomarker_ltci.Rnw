@@ -195,14 +195,22 @@ outcomes.
 
 \section{Cohort Definitions}
 Cohorts are defined separately for each time point (3 and 12 months) and for cognitive and
-functional outcomes, since patients could have at least some functional testing done by phone.
-Patients are included in the cognitive cohort if they had at least one cognitive test performed at
-the specified time point (including any RBANS domains, Trails A, Trails B and/or MMSE). Patients
+functional outcomes, since patients could have at least some functional testing done by phone. To be
+included in any analyses, patients must have had at least one biomarker measurement while in the
+ICU. Patients are included in the cognitive cohort if they had at least one cognitive test performed
+at the specified time point (including any RBANS domains, Trails A, Trails B and/or MMSE). Patients
 are included in the functional cohort if they had at least one functional test performed at the
-specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA frailty).
+specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA
+frailty).
 
 <<datamgmt>>=
-## -- Indicators for whether each patient is in cognitive or functional analysis cohort at each time
+## -- Indicator for whether patient has any biomarkers measured on any study day -------------------
+all.daily$had.biomarker <- rowSums(!is.na(all.daily[,biomarker.vnames])) > 0
+all.oneobs$had.biomarker <- all.oneobs$id %in% subset(all.daily, had.biomarker)$id
+
+## -- Indicators for whether each patient is in cognitive or functional analysis cohort at ---------
+## -- each time ------------------------------------------------------------------------------------
+
 ## Create vectors of tests included in "partial data" criteria at each time point for each cohort
 cog.varnames <- c('rbans.global.score', 'rbans.immmemory.tscore', 'rbans.visuo.tscore',
                   'rbans.delayedmem.tscore', 'rbans.language.tscore', 'trail.a.tscore',
@@ -215,20 +223,20 @@ all.fu$has.cog.data <- rowSums(!is.na(all.fu[,cog.varnames])) > 0
 all.fu$has.func.data <- rowSums(!is.na(all.fu[,func.varnames])) > 0
 
 ## Create indicators for whether patient is in cohort at each time
-all.oneobs$cog.cohort.3 <-
+all.oneobs$cog.cohort.3 <- all.oneobs$had.biomarker &
   all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.cog.data)$id
-all.oneobs$cog.cohort.12 <-
+all.oneobs$cog.cohort.12 <- all.oneobs$had.biomarker &
   all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.cog.data)$id
-all.oneobs$func.cohort.3 <-
+all.oneobs$func.cohort.3 <- all.oneobs$had.biomarker &
   all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.func.data)$id
-all.oneobs$func.cohort.12 <-
+all.oneobs$func.cohort.12 <- all.oneobs$had.biomarker &
   all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.func.data)$id
 
 ## Create indicators for whether patient is in each cohort at either time, for Table 1
 all.oneobs$cog.cohort.either <- all.oneobs$cog.cohort.3 | all.oneobs$cog.cohort.12
 all.oneobs$func.cohort.either <- all.oneobs$func.cohort.3 | all.oneobs$func.cohort.12
 
-## -- Calculate summary values for each biomarker for each patient ----------------------------------
+## -- Calculate summary values for each biomarker for each patient --------------------------------
 bio.summary.pt <- all.daily[,c('id', 'study.day', biomarker.vnames)] %>%
   gather(key = bio.marker, value = bio.value, crp.imp:tnfr1.imp) %>%
   filter(!is.na(bio.value)) %>%
@@ -259,7 +267,7 @@ bio.summary.wide <- bio.summary.pt %>%
   dplyr::select(-bio.marker, -measure) %>%
   spread(key = bio.vname, value = quantity)
 
-## -- Calculate inverse probability weights for each survivor: -------------------------------------
+## -- Calculate inverse probability weights for each survivor: ------------------------------------
 ## 1. Create aregImpute object to handle missing covariate data
 ## 2. Logistic regression, using "in cohort" as outcome
 ## 3. Get estimated probability for each person in cohort
@@ -277,12 +285,12 @@ dd <- datadist(model.data); options(datadist = 'dd')
 
 ## Create aregImpute object to use in weighting model
 set.seed(1)
-areg.weight <- aregImpute(~ age.enroll + charlson.score + I(edu) + I(iqcode.score.e) + stroke.risk +
-                            mean.benz.cube + mean.op.cube + mean.prop.cube + I(mean.dex.cube) +
-                            I(mean.hal.cube) + icudays.sevseptic.s + del.s.imp + coma.s.imp +
-                            mean.modsofa.icu + crp.mean.t + ifngamma.mean.t + il10.mean.t +
-                            il12.mean.t + il1b.mean.t + il6.mean.t + il8.mean.t + mmp9.mean.t +
-                            proteinc.mean.t + tnfa.mean.t + tnfr1.mean.t,
+areg.weight <- aregImpute(~ age.enroll + charlson.score + I(edu) + I(iqcode.score.e) +
+                            stroke.risk + mean.benz.cube + mean.op.cube + mean.prop.cube +
+                            I(mean.dex.cube) + I(mean.hal.cube) + icudays.sevseptic.s + del.s.imp +
+                            coma.s.imp + mean.modsofa.icu + crp.mean.t + ifngamma.mean.t +
+                            il10.mean.t + il12.mean.t + il1b.mean.t + il6.mean.t + il8.mean.t +
+                            mmp9.mean.t + proteinc.mean.t + tnfa.mean.t + tnfr1.mean.t,
                           n.impute = 10,
                           nk = 3,
                           data = model.data)
@@ -299,7 +307,8 @@ prob.cohort <- function(cohort.var){
                               rcs(crp.mean.t, 3) + rcs(ifngamma.mean.t, 3) +
                               rcs(il10.mean.t, 3) + rcs(il12.mean.t, 3) + rcs(il1b.mean.t, 3) +
                               rcs(il6.mean.t, 3) + il8.mean.t + rcs(mmp9.mean.t, 3) +
-                              rcs(proteinc.mean.t, 3) + rcs(tnfa.mean.t, 3) + rcs(tnfr1.mean.t, 3)",
+                              rcs(proteinc.mean.t, 3) + rcs(tnfa.mean.t, 3) +
+                              rcs(tnfr1.mean.t, 3)",
                             sep = ' ~ ')),
                             fitter = lrm,
                             xtrans = areg.weight,
@@ -327,7 +336,7 @@ model.data$wt.func.12 <- 1 / prob.func.12
 # ## Check using plots
 # ggplot(aes(x = cog.cohort.12, y = prob.cog.12), data = model.data) + geom_boxplot() + scale_y_continuous(limits = 0:1)
 
-## -- Create data set with all covariates, test scores, weights ------------------------------------
+## -- Create data set with all covariates, test scores, weights -----------------------------------
 ## Transpose followup scores
 model.fu.data <- all.fu %>%
   filter(fu.period %in% c('3 Month', '12 Month')) %>%
@@ -381,9 +390,11 @@ desc.vars <- c('age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqco
                'faq.totscore.12')
 
 desc.data.all <-
-  desc.data[desc.data$id %nin%
-              subset(all.oneobs, studywd.amt %in% c('2. W/D from Participation and All Data Collected',
-                                                    '4. N/A Study Staff Withdrew Patient'))$id,
+  desc.data[desc.data$id %in%
+              subset(all.oneobs,
+                     had.biomarker &
+                       !(studywd.amt %in% c('2. W/D from Participation and All Data Collected',
+                                            '4. N/A Study Staff Withdrew Patient')))$id,
             c('admit.dx', desc.vars)]
 desc.data.all$cohort <- 1
 desc.data.cog <- desc.data[desc.data$cog.cohort.either, c('admit.dx', desc.vars)]
@@ -394,7 +405,7 @@ desc.data.func$cohort <- 3
 desc.data.all <- rbind(desc.data.all, desc.data.cog, desc.data.func)
 desc.data.all$cohort <- factor(desc.data.all$cohort,
                                levels = 1:3,
-                               labels = c('All Patients',
+                               labels = c('All Patients with Biomarkers',
                                           'In Cognitive Outcomes Cohort',
                                           'In Functional Outcomes Cohort'))
 
