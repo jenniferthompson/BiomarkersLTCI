@@ -36,7 +36,7 @@ library(tidyr)
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'none'
+rerun.analyses <- 'all'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -222,6 +222,12 @@ func.varnames <- c('bdi.totscore', 'pcl.totscore', 'adl.totscore', 'faq.totscore
 all.fu$has.cog.data <- rowSums(!is.na(all.fu[,cog.varnames])) > 0
 all.fu$has.func.data <- rowSums(!is.na(all.fu[,func.varnames])) > 0
 
+## Indicators for complete vs. partial data
+all.fu$complete.cog <- ifelse(!all.fu$has.cog.data, NA,
+                              rowSums(!is.na(all.fu[,cog.varnames])) == length(cog.varnames))
+all.fu$complete.func <- ifelse(!all.fu$has.func.data, NA,
+                               rowSums(!is.na(all.fu[,func.varnames])) == length(func.varnames))
+
 ## Create indicators for whether patient is in cohort at each time
 all.oneobs$cog.cohort.3 <- all.oneobs$had.biomarker &
   all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.cog.data)$id
@@ -374,6 +380,138 @@ label(model.data$rbans.global.score.3) <- 'RBANS global score, 3m'
 label(model.data$rbans.global.score.12) <- 'RBANS global score, 12m'
 label(model.data$trail.b.tscore.3) <- 'Trails B T-score, 3m'
 label(model.data$trail.b.tscore.12) <- 'Trails B T-score, 12m'
+
+@
+
+<<ptprogress>>=
+## -- Create patient progress table (CONSORT info) -------------------------------------------------
+## Create status variables at hospital discharge, 3- and 12-month followup; death is prioritized
+##   over withdrawal, and having followup data is prioritized over a status of Deceased (in that
+##   case, assume status is a typo)
+all.oneobs$hosp.status <- with(all.oneobs, {
+  factor(ifelse(!is.na(studywd.amt) &
+                  studywd.amt %in% c('2. W/D from Participation and All Data Collected',
+                                     '4. N/A Study Staff Withdrew Patient'), 1,
+         ifelse(!is.na(died.inhosp) & died.inhosp == 'Died in hospital', 2,
+         ifelse(!is.na(studywd.amt) | !is.na(studywd.date), 3,
+         ifelse(!had.biomarker, 4, 5)))),
+         levels = 1:5,
+         labels = c('Withdrew and requested data be destroyed',
+                    'Died in hospital',
+                    'Withdrew in hospital',
+                    'Survived hospital, but no biomarker measured',
+                    'Survived with >=1 biomarker measured')) })
+
+all.oneobs$three.status.cog <- with(all.oneobs, {
+  factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
+         ifelse(hosp.status == 'Died in hospital', 2,
+         ifelse(hosp.status == 'Withdrew in hospital', 3,
+         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(cog.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & complete.cog)$id, 9,
+         ifelse(cog.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & !complete.cog)$id, 8,
+         ifelse(id %in% subset(all.fu, fu.period == '3 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(all.fu,
+                               fu.period == '3 Month' &
+                                 status == 'Living-Withdrew from the study')$id,
+                6,
+         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !cog.cohort.3, 7,
+                NA))))))))),
+         levels = 1:9,
+         labels = c('Withdrew and requested data be destroyed',
+                    'Died in hospital',
+                    'Withdrew in hospital',
+                    'Survived hospital, but no biomarker measured',
+                    'Died before 3-month followup',
+                    'Withdrew before 3-month followup',
+                    'Eligible for followup, but no cognitive data',
+                    'Partial cognitive data',
+                    'Complete cognitive data')) })
+
+all.oneobs$three.status.func <- with(all.oneobs, {
+  factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
+         ifelse(hosp.status == 'Died in hospital', 2,
+         ifelse(hosp.status == 'Withdrew in hospital', 3,
+         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(func.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & complete.func)$id,
+                9,
+         ifelse(func.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & !complete.func)$id,
+                8,
+         ifelse(id %in% subset(all.fu, fu.period == '3 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(all.fu,
+                               fu.period == '3 Month' &
+                                 status == 'Living-Withdrew from the study')$id,
+                6,
+         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !func.cohort.3, 7,
+                NA))))))))),
+         levels = 1:9,
+         labels = c('Withdrew and requested data be destroyed',
+                    'Died in hospital',
+                    'Withdrew in hospital',
+                    'Survived hospital, but no biomarker measured',
+                    'Died before 3-month followup',
+                    'Withdrew before 3-month followup',
+                    'Eligible for followup, but no functional data',
+                    'Partial functional data',
+                    'Complete functional data')) })
+
+all.oneobs$twelve.status.cog <- with(all.oneobs, {
+  factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
+         ifelse(hosp.status == 'Died in hospital' |
+                  three.status.cog == 'Died before 3-month followup', 2,
+         ifelse(hosp.status == 'Withdrew in hospital' |
+                  three.status.cog == 'Withdrew before 3-month followup', 3,
+         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(cog.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & complete.cog)$id,
+                9,
+         ifelse(cog.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & !complete.cog)$id,
+                8,
+         ifelse(id %in% subset(all.fu, fu.period == '12 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(all.fu,
+                               fu.period == '12 Month' &
+                                 status == 'Living-Withdrew from the study')$id,
+                6,
+         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !cog.cohort.12, 7,
+                NA))))))))),
+         levels = 1:9,
+         labels = c('Withdrew and requested data be destroyed',
+                    'Died in hospital or before 3-month followup',
+                    'Withdrew in hospital or before 3-month followup',
+                    'Survived hospital, but no biomarker measured',
+                    'Died between 3- and 12-month followup',
+                    'Withdrew between 3- and 12-month followup',
+                    'Eligible for followup, but no cognitive data',
+                    'Partial cognitive data',
+                    'Complete cognitive data')) })
+
+all.oneobs$twelve.status.func <- with(all.oneobs, {
+  factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
+         ifelse(hosp.status == 'Died in hospital' |
+                  three.status.func == 'Died before 3-month followup', 2,
+         ifelse(hosp.status == 'Withdrew in hospital' |
+                  three.status.func == 'Withdrew before 3-month followup', 3,
+         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(func.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & complete.func)$id,
+                9,
+         ifelse(func.cohort.12 &
+                  id %in% subset(all.fu, fu.period == '12 Month' & !complete.func)$id,
+                8,
+         ifelse(id %in% subset(all.fu, fu.period == '12 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(all.fu,
+                               fu.period == '12 Month' &
+                                 status == 'Living-Withdrew from the study')$id,
+                6,
+         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !func.cohort.12, 7,
+                NA))))))))),
+         levels = 1:9,
+         labels = c('Withdrew and requested data be destroyed',
+                    'Died in hospital or before 3-month followup',
+                    'Withdrew in hospital or before 3-month followup',
+                    'Survived hospital, but no biomarker measured',
+                    'Died between 3- and 12-month followup',
+                    'Withdrew between 3- and 12-month followup',
+                    'Eligible for followup, but no functional data',
+                    'Partial functional data',
+                    'Complete functional data')) })
 
 @
 
