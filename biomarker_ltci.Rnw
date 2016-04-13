@@ -32,6 +32,25 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 
+## -- Indicators for whether to completely rerun analyses, rerun imputed objects, and/or rerun -----
+## -- models only ----------------------------------------------------------------------------------
+
+## rerun.analyses should be one of "none", "models", "imputed", "all"
+rerun.analyses <- 'none'
+
+rerun.imputed <- rerun.models <- NULL
+if(rerun.analyses == 'none'){
+  rerun.imputed <- rerun.models <- FALSE
+} else if(rerun.analyses == 'models'){
+  rerun.imputed <- FALSE
+  rerun.models <- TRUE
+} else if(rerun.analyses == 'imputed'){
+  rerun.imputed <- TRUE
+  rerun.models <- FALSE
+} else{
+  rerun.imputed <- rerun.models <- TRUE
+}
+
 @
 
 <<fxnsetup>>=
@@ -240,7 +259,7 @@ bio.summary.wide <- bio.summary.pt %>%
   dplyr::select(-bio.marker, -measure) %>%
   spread(key = bio.vname, value = quantity)
 
-## -- Calculate inverse probability weights for each survivor: --------------------------------------
+## -- Calculate inverse probability weights for each survivor: -------------------------------------
 ## 1. Create aregImpute object to handle missing covariate data
 ## 2. Logistic regression, using "in cohort" as outcome
 ## 3. Get estimated probability for each person in cohort
@@ -407,7 +426,8 @@ label(desc.data.all$faq.totscore.12) = 'FAQ score, 12m'
 \end{landscape}
 
 <<printdescstats, results='asis'>>=
-latex(summaryM(formula(paste(paste(desc.vars, collapse = ' + '), '~ cohort')), data = desc.data.all),
+latex(summaryM(formula(paste(paste(desc.vars, collapse = ' + '), '~ cohort')),
+               data = desc.data.all),
       file = '',
       digits = 2,
       prn = FALSE,
@@ -485,43 +505,19 @@ multiplot(plotlist = wthist.list, layout = matrix(1:4, ncol = 4, byrow = TRUE))
 
 ## -- Create multiple imputation objects -----------------------------------------------------------
 ## Create data sets with only patients in each cohort
+## Done differently for cognitive and functional outcomes, because mice uses entire data set whereas
+##  aregImpute does not
 model.data.cog.3 <- subset(model.data, cog.cohort.3)
 model.data.cog.12 <- subset(model.data, cog.cohort.12)
 
-## Use aregImpute for cognitive outcomes
-create.areg.obj <- function(cohort.data, marker.measure){
-  areg.formula <-
-    as.formula(paste0('~ ',
-                      paste(c('age.enroll', 'charlson.score', 'I(iqcode.score.e)', 'stroke.risk',
-                              'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube', 'I(mean.dex.cube)',
-                              'I(mean.hal.cube)', 'icudays.sevseptic.s', 'del.s.imp',
-                              'as.numeric(frailty)', 'I(adl.e)', 'I(faq.e)',
-                              gsub('\\.imp$', paste0('.', marker.measure), biomarker.vnames)),
-                            collapse = ' + ')))
-
-  set.seed(56)
-  do.call('aregImpute',
-          list(formula = areg.formula,
-               n.impute = 10,
-               nk = 3,
-               data = cohort.data))
-}
-
-areg.cog.mean.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'mean')
-areg.cog.mean.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'mean')
-areg.cog.first.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'first')
-areg.cog.first.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'first')
-areg.cog.pctchg.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'pctchg')
-areg.cog.pctchg.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'pctchg')
-
-## Use mice for functional outcomes ##
 ## Create vector of variables to include in all imputations (covariates, outcome scores)
 always.use <- c('age.enroll', 'charlson.score', 'edu', 'iqcode.score.e', 'stroke.risk',
                 'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube', 'mean.dex.cube',
                 'mean.hal.cube', 'adl.e', 'faq.e', 'frailty', 'icudays.sevseptic.s',
-                'mean.modsofa.icu', 'del.s.imp', 'coma.s.imp', 'vent.los.tot.s', 'adl.totscore.12',
-                'adl.totscore.3', 'faq.rdscore.12', 'faq.rdscore.3', 'rbans.global.score.12',
-                'rbans.global.score.3', 'trail.b.tscore.12', 'trail.b.tscore.3')
+                'mean.modsofa.icu', 'del.s.imp', 'coma.s.imp', 'vent.los.tot.s',
+                'adl.totscore.12', 'adl.totscore.3', 'faq.rdscore.12', 'faq.rdscore.3',
+                'rbans.global.score.12', 'rbans.global.score.3', 'trail.b.tscore.12',
+                'trail.b.tscore.3')
 
 ## Create data sets with only patients included in each time point cohort
 model.data.func.3 <- model.data[model.data$func.cohort.3,
@@ -536,46 +532,92 @@ model.data.func.12 <- model.data[model.data$func.cohort.12,
                                    gsub('\\.imp', '\\.mean.t', biomarker.vnames),
                                    gsub('\\.imp', '\\.first.t', biomarker.vnames),
                                    gsub('\\.imp', '\\.pctchg', biomarker.vnames),
-                                  'wt.func.12')]
+                                   'wt.func.12')]
 
-## Create prediction matrix to use in mice() (same applies to both time points)
-## Create vector that is all 1s; function will replace diagonal and unused biomarker measures with 0s
-tmp <- c(rep(1, ncol(model.data.func.3) - 1), 0)
-names(tmp) <- colnames(model.data.func.3)
-create.mice.predmat <- function(marker.measure = c('mean', 'first', 'pctchg')){
-  tmpmat <- do.call(rbind,
-                    lapply(names(model.data.func.3), FUN = function(x){
-                      tmp2 <- tmp
+## -- If requested, recreate imputation objects; otherwise, load previously saved objects ----------
+if(rerun.imputed){
+  ## Use aregImpute for cognitive outcomes
+  create.areg.obj <- function(cohort.data, marker.measure){
+    areg.formula <-
+      as.formula(paste0('~ ',
+                        paste(c('age.enroll', 'charlson.score', 'I(iqcode.score.e)', 'stroke.risk',
+                                'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube',
+                                'I(mean.dex.cube)', 'I(mean.hal.cube)', 'icudays.sevseptic.s',
+                                'del.s.imp', 'as.numeric(frailty)', 'I(adl.e)', 'I(faq.e)',
+                                gsub('\\.imp$', paste0('.', marker.measure), biomarker.vnames)),
+                              collapse = ' + ')))
+    
+    set.seed(56)
+    do.call('aregImpute',
+            list(formula = areg.formula,
+                 n.impute = 10,
+                 nk = 3,
+                 data = cohort.data))
+  }
+  
+  areg.cog.mean.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'mean')
+  areg.cog.mean.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'mean')
+  areg.cog.first.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'first')
+  areg.cog.first.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'first')
+  areg.cog.pctchg.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'pctchg')
+  areg.cog.pctchg.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'pctchg')
+  
+  ## Use mice for functional outcomes ##
+  ## Create prediction matrix to use in mice() (same applies to both time points) ##
+  ## Create vector that is all 1s; function will replace diagonal and unused biomarker measures
+  ##  with 0s
+  tmp <- c(rep(1, ncol(model.data.func.3) - 1), 0)
+  names(tmp) <- colnames(model.data.func.3)
+  create.mice.predmat <- function(marker.measure = c('mean', 'first', 'pctchg')){
+    tmpmat <- do.call(rbind,
+                      lapply(names(model.data.func.3), FUN = function(x){
+                        tmp2 <- tmp
+                        
+                        ## Which marker measures are *not* being used?
+                        not.used <- setdiff(c('mean', 'first', 'pctchg'), marker.measure)
+                        not.used <- gsub('mean', 'mean\\.t', not.used)
+                        not.used <- gsub('first', 'first\\.t', not.used)
+                        
+                        replace.vars <-
+                          unique(c(x,
+                                   gsub('\\.imp', paste0('\\.', not.used[1]), biomarker.vnames),
+                                   gsub('\\.imp', paste0('\\.', not.used[2]), biomarker.vnames)))
+                        
+                        tmp2[replace.vars] <- 0
+                        return(tmp2)
+                      }))
+    
+    rownames(tmpmat) <- colnames(tmpmat) <- names(model.data.func.3)
+    return(tmpmat)
+  }
+  
+  mice.predmat.mean <- create.mice.predmat('mean')
+  mice.predmat.first <- create.mice.predmat('first')
+  mice.predmat.pctchg <- create.mice.predmat('pctchg')
+  
+  ## Create mice object for each biomarker measure
+  mice.mean.3 <-
+    mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.mean, seed = 56)
+  mice.mean.12 <-
+    mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.mean, seed = 56)
+  mice.first.3 <-
+    mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.first, seed = 56)
+  mice.first.12 <-
+    mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.first, seed = 56)
+  mice.pctchg.3 <-
+    mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
+  mice.pctchg.12 <-
+    mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
 
-                      ## Which marker measures are *not* being used?
-                      not.used <- setdiff(c('mean', 'first', 'pctchg'), marker.measure)
-                      not.used <- gsub('mean', 'mean\\.t', not.used)
-                      not.used <- gsub('first', 'first\\.t', not.used)
-
-                      replace.vars <-
-                        unique(c(x,
-                                 gsub('\\.imp', paste0('\\.', not.used[1]), biomarker.vnames),
-                                 gsub('\\.imp', paste0('\\.', not.used[2]), biomarker.vnames)))
-
-                      tmp2[replace.vars] <- 0
-                      return(tmp2)
-                    }))
-
-  rownames(tmpmat) <- colnames(tmpmat) <- names(model.data.func.3)
-  return(tmpmat)
+  save(areg.cog.first.3, areg.cog.first.12, areg.cog.mean.3, areg.cog.mean.12, areg.cog.pctchg.3,
+       areg.cog.pctchg.12, mice.first.3, mice.first.12, mice.mean.3, mice.mean.12, mice.pctchg.3,
+       mice.pctchg.12, mice.predmat.mean, mice.predmat.pctchg,
+       file = 'imputation_objects.Rdata')
+  
+} else{
+  load('imputation_objects.Rdata')
 }
 
-mice.predmat.mean <- create.mice.predmat('mean')
-mice.predmat.first <- create.mice.predmat('first')
-mice.predmat.pctchg <- create.mice.predmat('pctchg')
-
-## Create mice object for each biomarker measure
-mice.mean.3 <- mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.mean, seed = 56)
-mice.mean.12 <- mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.mean, seed = 56)
-mice.first.3 <- mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.first, seed = 56)
-mice.first.12 <- mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.first, seed = 56)
-mice.pctchg.3 <- mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
-mice.pctchg.12 <- mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
 
 dd <- datadist(model.data); options(datadist = 'dd')
 
@@ -667,35 +709,42 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   mean.rbans3.form <-
     as.formula(make.modform('rbans.global.score.3', transmarker.mean, cog.covar))
   mean.rbans.nowt.3 <-
-    fit.mult.impute(mean.rbans3.form, fitter = ols, xtrans = areg.cog.mean.3, data = model.data.cog.3)
+    fit.mult.impute(mean.rbans3.form,
+                    fitter = ols, xtrans = areg.cog.mean.3, data = model.data.cog.3)
   mean.rbans.wt.3 <-
-    fit.mult.impute(mean.rbans3.form, fitter = ols.fix, xtrans = areg.cog.mean.3, weights = wt.cog.3,
+    fit.mult.impute(mean.rbans3.form,
+                    fitter = ols.fix, xtrans = areg.cog.mean.3, weights = wt.cog.3,
                     data = model.data.cog.3)
 
   mean.rbans12.form <-
     as.formula(make.modform('rbans.global.score.12', transmarker.mean, cog.covar))
   mean.rbans.nowt.12 <-
-    fit.mult.impute(mean.rbans12.form, fitter = ols, xtrans = areg.cog.mean.12, data = model.data.cog.12)
+    fit.mult.impute(mean.rbans12.form,
+                    fitter = ols, xtrans = areg.cog.mean.12, data = model.data.cog.12)
   mean.rbans.wt.12 <-
-    fit.mult.impute(mean.rbans12.form, fitter = ols.fix, xtrans = areg.cog.mean.12, weights = wt.cog.12,
+    fit.mult.impute(mean.rbans12.form,
+                    fitter = ols.fix, xtrans = areg.cog.mean.12, weights = wt.cog.12,
                     data = model.data.cog.12)
 
   ## First vs. RBANS
   first.rbans3.form <-
     as.formula(make.modform('rbans.global.score.3', transmarker.first, cog.covar))
   first.rbans.nowt.3 <-
-    fit.mult.impute(first.rbans3.form, fitter = ols, xtrans = areg.cog.first.3, data = model.data.cog.3)
+    fit.mult.impute(first.rbans3.form,
+                    fitter = ols, xtrans = areg.cog.first.3, data = model.data.cog.3)
   first.rbans.wt.3 <-
-    fit.mult.impute(first.rbans3.form, fitter = ols.fix, xtrans = areg.cog.first.3, weights = wt.cog.3,
+    fit.mult.impute(first.rbans3.form,
+                    fitter = ols.fix, xtrans = areg.cog.first.3, weights = wt.cog.3,
                     data = model.data.cog.3)
 
   first.rbans12.form <-
     as.formula(make.modform('rbans.global.score.12', transmarker.first, cog.covar))
   first.rbans.nowt.12 <-
-    fit.mult.impute(first.rbans12.form, fitter = ols, xtrans = areg.cog.first.12,
-                    data = model.data.cog.12)
+    fit.mult.impute(first.rbans12.form,
+                    fitter = ols, xtrans = areg.cog.first.12, data = model.data.cog.12)
   first.rbans.wt.12 <-
-    fit.mult.impute(first.rbans12.form, fitter = ols.fix, xtrans = areg.cog.first.12,
+    fit.mult.impute(first.rbans12.form,
+                    fitter = ols.fix, xtrans = areg.cog.first.12,
                     weights = wt.cog.12, data = model.data.cog.12)
 
   ## % change vs. RBANS
@@ -735,7 +784,8 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
     fit.mult.impute(mean.trailb12.form, fitter = ols, xtrans = areg.cog.mean.12,
                     data = model.data.cog.12)
   mean.trailb.wt.12 <-
-    fit.mult.impute(mean.trailb12.form, fitter = ols.fix, xtrans = areg.cog.mean.12, weights = wt.cog.12,
+    fit.mult.impute(mean.trailb12.form,
+                    fitter = ols.fix, xtrans = areg.cog.mean.12, weights = wt.cog.12,
                     data = model.data.cog.12)
 
   ## First vs. Trails B
@@ -918,54 +968,72 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
               'pctchg.faq.wt.12' = pctchg.faq.wt.12))
 }
 
-## Models without delirium
-crp.mods <- run.marker.mods('crp')
-ifngamma.mods <- run.marker.mods('ifngamma')
-il10.mods <- run.marker.mods('il10')
-il12.mods <- run.marker.mods('il12')
-il1b.mods <- run.marker.mods('il1b')
-il6.mods <- run.marker.mods('il6')
-il8.mods <- run.marker.mods('il8')
-mmp9.mods <- run.marker.mods('mmp9')
-proteinc.mods <- run.marker.mods('proteinc')
-tnfa.mods <- run.marker.mods('tnfa')
-tnfr1.mods <- run.marker.mods('tnfr1')
-
-
-## Models with delirium
-crp.del.mods <- run.marker.mods('crp',
-                                cog.covar = covar.del.cog,
-                                func.covar = covar.del.func)
-ifngamma.del.mods <- run.marker.mods('ifngamma',
-                                     cog.covar = covar.del.cog,
-                                     func.covar = covar.del.func)
-il10.del.mods <- run.marker.mods('il10',
-                                 cog.covar = covar.del.cog,
-                                 func.covar = covar.del.func)
-il12.del.mods <- run.marker.mods('il12',
-                                 cog.covar = covar.del.cog,
-                                 func.covar = covar.del.func)
-il1b.del.mods <- run.marker.mods('il1b',
-                                 cog.covar = covar.del.cog,
-                                 func.covar = covar.del.func)
-il6.del.mods <- run.marker.mods('il6',
-                                cog.covar = covar.del.cog,
-                                func.covar = covar.del.func)
-il8.del.mods <- run.marker.mods('il8',
-                                cog.covar = covar.del.cog,
-                                func.covar = covar.del.func)
-mmp9.del.mods <- run.marker.mods('mmp9',
-                                 cog.covar = covar.del.cog,
-                                 func.covar = covar.del.func)
-proteinc.del.mods <- run.marker.mods('proteinc',
-                                     cog.covar = covar.del.cog,
-                                     func.covar = covar.del.func)
-tnfa.del.mods <- run.marker.mods('tnfa',
-                                 cog.covar = covar.del.cog,
-                                 func.covar = covar.del.func)
-tnfr1.del.mods <- run.marker.mods('tnfr1',
+## -- If requested, rerun models; otherwise, load saved objects ------------------------------------
+if(rerun.models){
+  ## Models without delirium
+  crp.mods <- run.marker.mods('crp')
+  ifngamma.mods <- run.marker.mods('ifngamma')
+  il10.mods <- run.marker.mods('il10')
+  il12.mods <- run.marker.mods('il12')
+  il1b.mods <- run.marker.mods('il1b')
+  il6.mods <- run.marker.mods('il6')
+  il8.mods <- run.marker.mods('il8')
+  mmp9.mods <- run.marker.mods('mmp9')
+  proteinc.mods <- run.marker.mods('proteinc')
+  tnfa.mods <- run.marker.mods('tnfa')
+  tnfr1.mods <- run.marker.mods('tnfr1')
+  
+  
+  ## Models with delirium
+  crp.del.mods <- run.marker.mods('crp',
                                   cog.covar = covar.del.cog,
                                   func.covar = covar.del.func)
+  ifngamma.del.mods <- run.marker.mods('ifngamma',
+                                       cog.covar = covar.del.cog,
+                                       func.covar = covar.del.func)
+  il10.del.mods <- run.marker.mods('il10',
+                                   cog.covar = covar.del.cog,
+                                   func.covar = covar.del.func)
+  il12.del.mods <- run.marker.mods('il12',
+                                   cog.covar = covar.del.cog,
+                                   func.covar = covar.del.func)
+  il1b.del.mods <- run.marker.mods('il1b',
+                                   cog.covar = covar.del.cog,
+                                   func.covar = covar.del.func)
+  il6.del.mods <- run.marker.mods('il6',
+                                  cog.covar = covar.del.cog,
+                                  func.covar = covar.del.func)
+  il8.del.mods <- run.marker.mods('il8',
+                                  cog.covar = covar.del.cog,
+                                  func.covar = covar.del.func)
+  mmp9.del.mods <- run.marker.mods('mmp9',
+                                   cog.covar = covar.del.cog,
+                                   func.covar = covar.del.func)
+  proteinc.del.mods <- run.marker.mods('proteinc',
+                                       cog.covar = covar.del.cog,
+                                       func.covar = covar.del.func)
+  tnfa.del.mods <- run.marker.mods('tnfa',
+                                   cog.covar = covar.del.cog,
+                                   func.covar = covar.del.func)
+  tnfr1.del.mods <- run.marker.mods('tnfr1',
+                                    cog.covar = covar.del.cog,
+                                    func.covar = covar.del.func)
+  
+  save(crp.mods, crp.del.mods,
+       ifngamma.mods, ifngamma.del.mods,
+       il10.mods, il10.del.mods,
+       il12.mods, il12.del.mods,
+       il1b.mods, il1b.del.mods,
+       il6.mods, il6.del.mods,
+       il8.mods, il8.del.mods,
+       mmp9.mods, mmp9.del.mods,
+       proteinc.mods, proteinc.del.mods,
+       tnfa.mods, tnfa.del.mods,
+       tnfr1.mods, tnfr1.del.mods,
+       file = 'run_marker_mods_objects.Rdata')
+} else{
+  load('run_marker_mods_objects.Rdata')
+}
 
 # ## -- Function to check linear model diagnostics ---------------------------------------------------
 # check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, title.str = NULL){
@@ -1401,16 +1469,15 @@ tnfr1.del.func.pvals <- func.bio.pvals(mod.list = tnfr1.del.mods,
 
 ## -- Need to calculate predicted values by hand ---------------------------------------------------
 ## Create design matrix, adjusting all covariates to median or mode
-pred.vars <- intersect(names(crp.mods$mean.adl.nowt.3$analyses[[1]]$coefficients), names(model.data))
+pred.vars <- intersect(names(crp.mods$mean.adl.nowt.3$analyses[[1]]$coefficients),
+                       names(model.data))
 pred.del.vars <- intersect(names(crp.del.mods$mean.adl.nowt.3$analyses[[1]]$coefficients),
                            names(model.data))
 ## All our current covariates are numeric and linear, which is helpful
 pred.vec <- unlist(lapply(pred.vars, FUN = function(predvar){
-  median(model.data[,predvar], na.rm = TRUE)
-}))
+  median(model.data[,predvar], na.rm = TRUE) }))
 pred.del.vec <- unlist(lapply(pred.del.vars, FUN = function(predvar){
-  median(model.data[,predvar], na.rm = TRUE)
-}))
+  median(model.data[,predvar], na.rm = TRUE) }))
 
 ## Function to, for each row in design matrix, calculate predicted value and SE from pooled results
 calc.funcresults <- function(biomod, pred.vals){
@@ -1523,8 +1590,10 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
 ## Without delirium
 crp.rbans.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'rbans')
 crp.trailb.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'trailb')
-ifngamma.rbans.results <- create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'rbans')
-ifngamma.trailb.results <- create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'trailb')
+ifngamma.rbans.results <-
+  create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'rbans')
+ifngamma.trailb.results <-
+  create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'trailb')
 il10.rbans.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'rbans')
 il10.trailb.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'trailb')
 il12.rbans.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'rbans')
@@ -1537,8 +1606,10 @@ il8.rbans.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'r
 il8.trailb.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'trailb')
 mmp9.rbans.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'rbans')
 mmp9.trailb.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'trailb')
-proteinc.rbans.results <- create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'rbans')
-proteinc.trailb.results <- create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'trailb')
+proteinc.rbans.results <-
+  create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'rbans')
+proteinc.trailb.results <-
+  create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'trailb')
 tnfa.rbans.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'rbans')
 tnfa.trailb.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'trailb')
 tnfr1.rbans.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'rbans')
