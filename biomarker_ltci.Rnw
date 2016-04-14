@@ -36,7 +36,7 @@ library(tidyr)
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'all'
+rerun.analyses <- 'none'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -383,6 +383,8 @@ label(model.data$trail.b.tscore.12) <- 'Trails B T-score, 12m'
 
 @
 
+\section{Patient Progress During Study and Descriptive Statistics}
+\end{landscape}
 <<ptprogress>>=
 ## -- Create patient progress table (CONSORT info) -------------------------------------------------
 ## Create status variables at hospital discharge, 3- and 12-month followup; death is prioritized
@@ -513,6 +515,116 @@ all.oneobs$twelve.status.func <- with(all.oneobs, {
                     'Partial functional data',
                     'Complete functional data')) })
 
+## Get Ns for each patient status category
+n.enrolled <- nrow(all.oneobs)
+
+## In-hospital section
+hosp.table <- table(all.oneobs$hosp.status, useNA = 'ifany')
+
+n.destroyed <- as.numeric(hosp.table['Withdrew and requested data be destroyed'])
+n.entire <- n.enrolled - n.destroyed
+n.died.hosp <- as.numeric(hosp.table['Died in hospital'])
+n.wd.hosp <- as.numeric(hosp.table['Withdrew in hospital'])
+n.nobio <- as.numeric(hosp.table['Survived hospital, but no biomarker measured'])
+n.elig.3 <- as.numeric(hosp.table['Survived with >=1 biomarker measured'])
+
+## 3-month section
+three.cog.table <- table(all.oneobs$three.status.cog, useNA = 'ifany')
+three.func.table <- table(all.oneobs$three.status.func, useNA = 'ifany')
+
+n.died.3 <- as.numeric(three.cog.table['Died before 3-month followup'])
+n.wd.3 <- as.numeric(three.cog.table['Withdrew before 3-month followup'])
+n.nocog.3 <- as.numeric(three.cog.table['Eligible for followup, but no cognitive data'])
+n.partcog.3 <- as.numeric(three.cog.table['Partial cognitive data'])
+n.compcog.3 <- as.numeric(three.cog.table['Complete cognitive data'])
+n.macog.3 <- n.partcog.3 + n.compcog.3
+n.nofunc.3 <- as.numeric(three.func.table['Eligible for followup, but no functional data'])
+n.partfunc.3 <- as.numeric(three.func.table['Partial functional data'])
+n.compfunc.3 <- as.numeric(three.func.table['Complete functional data'])
+n.mafunc.3 <- n.partfunc.3 + n.compfunc.3
+
+## 12-month section
+twelve.cog.table <- table(all.oneobs$twelve.status.cog, useNA = 'ifany')
+twelve.func.table <- table(all.oneobs$twelve.status.func, useNA = 'ifany')
+
+n.elig.12 <- n.nocog.3 + n.macog.3
+n.died.12 <- as.numeric(twelve.cog.table['Died between 3- and 12-month followup'])
+n.wd.12 <- as.numeric(twelve.cog.table['Withdrew between 3- and 12-month followup'])
+n.nocog.12 <- as.numeric(twelve.cog.table['Eligible for followup, but no cognitive data'])
+n.partcog.12 <- as.numeric(twelve.cog.table['Partial cognitive data'])
+n.compcog.12 <- as.numeric(twelve.cog.table['Complete cognitive data'])
+n.macog.12 <- n.partcog.12 + n.compcog.12
+n.nofunc.12 <- as.numeric(twelve.func.table['Eligible for followup, but no functional data'])
+n.partfunc.12 <- as.numeric(twelve.func.table['Partial functional data'])
+n.compfunc.12 <- as.numeric(twelve.func.table['Complete functional data'])
+n.mafunc.12 <- n.partfunc.12 + n.compfunc.12
+
+consort.df <- data.frame(n = c(n.enrolled, n.destroyed, n.entire,
+                               n.died.hosp, n.wd.hosp, n.nobio, n.elig.3,
+                               n.died.3, n.wd.3,
+                               NA, n.nocog.3, n.macog.3, n.partcog.3, n.compcog.3,
+                               NA, n.nofunc.3, n.mafunc.3, n.partfunc.3, n.compfunc.3,
+                               n.elig.12, n.died.12, n.wd.12,
+                               NA, n.nocog.12, n.macog.12, n.partcog.12, n.compcog.12,
+                               NA, n.nofunc.12, n.mafunc.12, n.partfunc.12, n.compfunc.12),
+                         denom = c(NA, n.enrolled, NA,
+                                   rep(n.entire, 4),
+                                   rep(n.elig.3, 5), rep(n.macog.3, 2),
+                                   rep(n.elig.3, 3), rep(n.mafunc.3, 2),
+                                   n.entire, rep(n.elig.12, 5), rep(n.macog.12, 2),
+                                   rep(n.elig.12, 3), rep(n.mafunc.12, 2)))
+consort.df$rowlab <- c('Enrolled', '~~~Withdrew, requested data be destroyed',
+                       '~~~\\textbf{Enrolled with data}',
+                       '~~~~~~Died in the hospital',
+                       '~~~~~~Withdrew in the hospital',
+                       '~~~~~~Survived, but no biomarker measured',
+                       '~~~~~~\\textbf{Eligible for followup cohorts}',
+                       '~~~~~~~~~Died before 3-month followup',
+                       '~~~~~~~~~Withdrew before 3-month followup',
+                       '~~~~~~~~~Cognitive outcomes cohort, 3m:',
+                       '~~~~~~~~~~~~No cognitive data',
+                       '~~~~~~~~~~~~\\textbf{In 3m cognitive main analysis cohort}',
+                       '~~~~~~~~~~~~~~~\\emph{Partial cognitive outcomes}',
+                       '~~~~~~~~~~~~~~~\\emph{Complete cognitive outcomes}',
+                       '~~~~~~~~~Functional outcomes cohort, 3m:',
+                       '~~~~~~~~~~~~No functional data',
+                       '~~~~~~~~~~~~\\textbf{In 3m functional main analysis cohort}',
+                       '~~~~~~~~~~~~~~~\\emph{Partial functional outcomes}',
+                       '~~~~~~~~~~~~~~~\\emph{Complete functional outcomes}',
+                       '~~~~~~\\textbf{Eligible for 12-month followup}',
+                       '~~~~~~~~~Died between 3- and 12-month followup',
+                       '~~~~~~~~~Withdrew between 3- and 12-month followup',
+                       '~~~~~~~~~Cognitive outcomes cohort, 12m:',
+                       '~~~~~~~~~~~~No cognitive data',
+                       '~~~~~~~~~~~~\\textbf{In 12m cognitive main analysis cohort}',
+                       '~~~~~~~~~~~~~~~\\emph{Partial cognitive outcomes}',
+                       '~~~~~~~~~~~~~~~\\emph{Complete cognitive outcomes}',
+                       '~~~~~~~~~Functional outcomes cohort, 12m:',
+                       '~~~~~~~~~~~~No functional data',
+                       '~~~~~~~~~~~~\\textbf{In 12m functional main analysis cohort}',
+                       '~~~~~~~~~~~~~~~\\emph{Partial functional outcomes}',
+                       '~~~~~~~~~~~~~~~\\emph{Complete functional outcomes}')
+
+consort.df$npct <- with(consort.df, ifelse(is.na(n), '',
+                                    ifelse(is.na(denom), as.character(n),
+                                           paste0(round((n / denom)*100), '\\% (', n, ')'))))
+rownames(consort.df) <- unlist(lapply(1:nrow(consort.df), FUN = function(i){
+  paste(rep(' ', i), collapse = '')
+}))
+
+@
+
+<<printptprogress, results = 'asis'>>=
+latex(consort.df[,c('rowlab', 'npct')], file = '', title = '',
+      caption = 'Patient Progress During Study',
+      caption.lot = 'Patient Progress During Study',
+      # rowname = NULL,
+      landscape = TRUE,
+      colheads = c('', 'Percent (N)'),
+      col.just = c('l', 'r'),
+      rgroup = c('In-Hospital Status', 'Three-Month Status', 'Twelve-Month Status'),
+      n.rgroup = c(7, 13, 12))
+
 @
 
 <<desctables>>=
@@ -535,17 +647,15 @@ desc.data.all <-
                                             '4. N/A Study Staff Withdrew Patient')))$id,
             c('admit.dx', desc.vars)]
 desc.data.all$cohort <- 1
-desc.data.cog <- desc.data[desc.data$cog.cohort.either, c('admit.dx', desc.vars)]
-desc.data.cog$cohort <- 2
-desc.data.func <- desc.data[desc.data$func.cohort.either, c('admit.dx', desc.vars)]
-desc.data.func$cohort <- 3
+desc.data.longterm <- desc.data[desc.data$cog.cohort.either | desc.data$func.cohort.either,
+                                c('admit.dx', desc.vars)]
+desc.data.longterm$cohort <- 2
 
-desc.data.all <- rbind(desc.data.all, desc.data.cog, desc.data.func)
+desc.data.all <- rbind(desc.data.all, desc.data.longterm)
 desc.data.all$cohort <- factor(desc.data.all$cohort,
-                               levels = 1:3,
-                               labels = c('All Patients with Biomarkers',
-                                          'In Cognitive Outcomes Cohort',
-                                          'In Functional Outcomes Cohort'))
+                               levels = 1:2,
+                               labels = c('Enrolled Patients with Biomarkers',
+                                          'Patients with >=1 Biomarker + Long-Term Outcomes'))
 
 label(desc.data.all$sex.pp) = 'Sex'
 label(desc.data.all$race.pp) = 'Race'
@@ -572,7 +682,6 @@ label(desc.data.all$faq.totscore.3) = 'FAQ score, 3m'
 label(desc.data.all$faq.totscore.12) = 'FAQ score, 12m'
 
 @
-\end{landscape}
 
 <<printdescstats, results='asis'>>=
 latex(summaryM(formula(paste(paste(desc.vars, collapse = ' + '), '~ cohort')),
