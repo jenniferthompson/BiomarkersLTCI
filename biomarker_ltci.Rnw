@@ -196,17 +196,17 @@ outcomes.
 \section{Cohort Definitions}
 Cohorts are defined separately for each time point (3 and 12 months) and for cognitive and
 functional outcomes, since patients could have at least some functional testing done by phone. To be
-included in any analyses, patients must have had at least one biomarker measurement while in the
-ICU. Patients are included in the cognitive cohort if they had at least one cognitive test performed
-at the specified time point (including any RBANS domains, Trails A, Trails B and/or MMSE). Patients
-are included in the functional cohort if they had at least one functional test performed at the
-specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA
+included in any analyses, patients must have had at least one day with all biomarkers measured while
+in the ICU. Patients are included in the cognitive cohort if they had at least one cognitive test performed at the specified time point (including any RBANS domains, Trails A, Trails B and/or MMSE).
+Patients are included in the functional cohort if they had at least one functional test performed at
+the specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA
 frailty).
 
 <<datamgmt>>=
 ## -- Indicator for whether patient has any biomarkers measured on any study day -------------------
-all.daily$had.biomarker <- rowSums(!is.na(all.daily[,biomarker.vnames])) > 0
-all.oneobs$had.biomarker <- all.oneobs$id %in% subset(all.daily, had.biomarker)$id
+all.daily$had.all.biomarkers <-
+  rowSums(!is.na(all.daily[,biomarker.vnames])) == length(biomarker.vnames)
+all.oneobs$had.all.biomarkers <- all.oneobs$id %in% subset(all.daily, had.all.biomarkers)$id
 
 ## -- Indicators for whether each patient is in cognitive or functional analysis cohort at ---------
 ## -- each time ------------------------------------------------------------------------------------
@@ -229,13 +229,13 @@ all.fu$complete.func <- ifelse(!all.fu$has.func.data, NA,
                                rowSums(!is.na(all.fu[,func.varnames])) == length(func.varnames))
 
 ## Create indicators for whether patient is in cohort at each time
-all.oneobs$cog.cohort.3 <- all.oneobs$had.biomarker &
+all.oneobs$cog.cohort.3 <- all.oneobs$had.all.biomarkers &
   all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.cog.data)$id
-all.oneobs$cog.cohort.12 <- all.oneobs$had.biomarker &
+all.oneobs$cog.cohort.12 <- all.oneobs$had.all.biomarkers &
   all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.cog.data)$id
-all.oneobs$func.cohort.3 <- all.oneobs$had.biomarker &
+all.oneobs$func.cohort.3 <- all.oneobs$had.all.biomarkers &
   all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.func.data)$id
-all.oneobs$func.cohort.12 <- all.oneobs$had.biomarker &
+all.oneobs$func.cohort.12 <- all.oneobs$had.all.biomarkers &
   all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.func.data)$id
 
 ## Create indicators for whether patient is in each cohort at either time, for Table 1
@@ -243,7 +243,8 @@ all.oneobs$cog.cohort.either <- all.oneobs$cog.cohort.3 | all.oneobs$cog.cohort.
 all.oneobs$func.cohort.either <- all.oneobs$func.cohort.3 | all.oneobs$func.cohort.12
 
 ## -- Calculate summary values for each biomarker for each patient --------------------------------
-bio.summary.pt <- all.daily[,c('id', 'study.day', biomarker.vnames)] %>%
+bio.summary.pt <- all.daily[all.daily$had.all.biomarkers
+                            ,c('id', 'study.day', biomarker.vnames)] %>%
   gather(key = bio.marker, value = bio.value, crp.imp:tnfr1.imp) %>%
   filter(!is.na(bio.value)) %>%
   arrange(id, study.day) %>%
@@ -281,6 +282,7 @@ bio.summary.wide <- bio.summary.pt %>%
 
 ## Create data set for imputation and modeling data
 model.data <- subset(all.oneobs,
+                     had.all.biomarkers,
                      select = c(id, age.enroll, charlson.score, edu, iqcode.score.e, stroke.risk,
                                 mean.benz.cube, mean.op.cube, mean.prop.cube, mean.dex.cube,
                                 mean.hal.cube, adl.e, faq.e, frailty, icudays.sevseptic.s,
@@ -400,19 +402,19 @@ all.oneobs$hosp.status <- with(all.oneobs, {
                                      '4. N/A Study Staff Withdrew Patient'), 1,
          ifelse(!is.na(died.inhosp) & died.inhosp == 'Died in hospital', 2,
          ifelse(!is.na(studywd.amt) | !is.na(studywd.date), 3,
-         ifelse(!had.biomarker, 4, 5)))),
+         ifelse(!had.all.biomarkers, 4, 5)))),
          levels = 1:5,
          labels = c('Withdrew and requested data be destroyed',
                     'Died in hospital',
                     'Withdrew in hospital',
-                    'Survived hospital, but no biomarker measured',
-                    'Survived with >=1 biomarker measured')) })
+                    'Survived hospital, but no days with all biomarkers',
+                    'Survived with >=1 day all biomarkers measured')) })
 
 all.oneobs$three.status.cog <- with(all.oneobs, {
   factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
          ifelse(hosp.status == 'Died in hospital', 2,
          ifelse(hosp.status == 'Withdrew in hospital', 3,
-         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
          ifelse(cog.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & complete.cog)$id, 9,
          ifelse(cog.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & !complete.cog)$id, 8,
          ifelse(id %in% subset(all.fu, fu.period == '3 Month' & status == 'Deceased')$id, 5,
@@ -420,13 +422,13 @@ all.oneobs$three.status.cog <- with(all.oneobs, {
                                fu.period == '3 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
-         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !cog.cohort.3, 7,
+         ifelse(hosp.status == 'Survived with >=1 day all biomarkers measured' & !cog.cohort.3, 7,
                 NA))))))))),
          levels = 1:9,
          labels = c('Withdrew and requested data be destroyed',
                     'Died in hospital',
                     'Withdrew in hospital',
-                    'Survived hospital, but no biomarker measured',
+                    'Survived hospital, but no days with all biomarkers',
                     'Died before 3-month followup',
                     'Withdrew before 3-month followup',
                     'Eligible for followup, but no cognitive data',
@@ -437,7 +439,7 @@ all.oneobs$three.status.func <- with(all.oneobs, {
   factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
          ifelse(hosp.status == 'Died in hospital', 2,
          ifelse(hosp.status == 'Withdrew in hospital', 3,
-         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
          ifelse(func.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & complete.func)$id,
                 9,
          ifelse(func.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & !complete.func)$id,
@@ -447,13 +449,13 @@ all.oneobs$three.status.func <- with(all.oneobs, {
                                fu.period == '3 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
-         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !func.cohort.3, 7,
+         ifelse(hosp.status == 'Survived with >=1 day all biomarkers measured' & !func.cohort.3, 7,
                 NA))))))))),
          levels = 1:9,
          labels = c('Withdrew and requested data be destroyed',
                     'Died in hospital',
                     'Withdrew in hospital',
-                    'Survived hospital, but no biomarker measured',
+                    'Survived hospital, but no days with all biomarkers',
                     'Died before 3-month followup',
                     'Withdrew before 3-month followup',
                     'Eligible for followup, but no functional data',
@@ -466,7 +468,7 @@ all.oneobs$twelve.status.cog <- with(all.oneobs, {
                   three.status.cog == 'Died before 3-month followup', 2,
          ifelse(hosp.status == 'Withdrew in hospital' |
                   three.status.cog == 'Withdrew before 3-month followup', 3,
-         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
          ifelse(cog.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & complete.cog)$id,
                 9,
          ifelse(cog.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & !complete.cog)$id,
@@ -476,13 +478,13 @@ all.oneobs$twelve.status.cog <- with(all.oneobs, {
                                fu.period == '12 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
-         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !cog.cohort.12, 7,
+         ifelse(hosp.status == 'Survived with >=1 day all biomarkers measured' & !cog.cohort.12, 7,
                 NA))))))))),
          levels = 1:9,
          labels = c('Withdrew and requested data be destroyed',
                     'Died in hospital or before 3-month followup',
                     'Withdrew in hospital or before 3-month followup',
-                    'Survived hospital, but no biomarker measured',
+                    'Survived hospital, but no days with all biomarkers',
                     'Died between 3- and 12-month followup',
                     'Withdrew between 3- and 12-month followup',
                     'Eligible for followup, but no cognitive data',
@@ -495,7 +497,7 @@ all.oneobs$twelve.status.func <- with(all.oneobs, {
                   three.status.func == 'Died before 3-month followup', 2,
          ifelse(hosp.status == 'Withdrew in hospital' |
                   three.status.func == 'Withdrew before 3-month followup', 3,
-         ifelse(hosp.status == 'Survived hospital, but no biomarker measured', 4,
+         ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
          ifelse(func.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & complete.func)$id,
                 9,
          ifelse(func.cohort.12 &
@@ -506,13 +508,13 @@ all.oneobs$twelve.status.func <- with(all.oneobs, {
                                fu.period == '12 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
-         ifelse(hosp.status == 'Survived with >=1 biomarker measured' & !func.cohort.12, 7,
+         ifelse(hosp.status == 'Survived with >=1 day all biomarkers measured' & !func.cohort.12, 7,
                 NA))))))))),
          levels = 1:9,
          labels = c('Withdrew and requested data be destroyed',
                     'Died in hospital or before 3-month followup',
                     'Withdrew in hospital or before 3-month followup',
-                    'Survived hospital, but no biomarker measured',
+                    'Survived hospital, but no days with all biomarkers',
                     'Died between 3- and 12-month followup',
                     'Withdrew between 3- and 12-month followup',
                     'Eligible for followup, but no functional data',
@@ -529,8 +531,8 @@ n.destroyed <- as.numeric(hosp.table['Withdrew and requested data be destroyed']
 n.entire <- n.enrolled - n.destroyed
 n.died.hosp <- as.numeric(hosp.table['Died in hospital'])
 n.wd.hosp <- as.numeric(hosp.table['Withdrew in hospital'])
-n.nobio <- as.numeric(hosp.table['Survived hospital, but no biomarker measured'])
-n.elig.3 <- as.numeric(hosp.table['Survived with >=1 biomarker measured'])
+n.nobio <- as.numeric(hosp.table['Survived hospital, but no days with all biomarkers'])
+n.elig.3 <- as.numeric(hosp.table['Survived with >=1 day all biomarkers measured'])
 
 ## 3-month section
 three.cog.table <- table(all.oneobs$three.status.cog, useNA = 'ifany')
@@ -581,7 +583,7 @@ consort.df$rowlab <- c('Enrolled', '~~~Withdrew, requested data be destroyed',
                        '~~~\\textbf{Enrolled with data}',
                        '~~~~~~Died in the hospital',
                        '~~~~~~Withdrew in the hospital',
-                       '~~~~~~Survived, but no biomarker measured',
+                       '~~~~~~Survived, but no days with complete biomarker data',
                        '~~~~~~\\textbf{Eligible for followup cohorts}',
                        '~~~~~~~~~Died before 3-month followup',
                        '~~~~~~~~~Withdrew before 3-month followup',
@@ -646,7 +648,7 @@ desc.vars <- c('age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqco
 desc.data.all <-
   desc.data[desc.data$id %in%
               subset(all.oneobs,
-                     had.biomarker &
+                     had.all.biomarkers &
                        !(studywd.amt %in% c('2. W/D from Participation and All Data Collected',
                                             '4. N/A Study Staff Withdrew Patient')))$id,
             c('admit.dx', desc.vars)]
@@ -659,7 +661,7 @@ desc.data.all <- rbind(desc.data.all, desc.data.longterm)
 desc.data.all$cohort <- factor(desc.data.all$cohort,
                                levels = 1:2,
                                labels = c('Enrolled Patients with Biomarkers',
-                                          'Patients with >=1 Biomarker + Long-Term Outcomes'))
+                                          'Patients with Biomarkers + Long-Term Outcomes'))
 
 label(desc.data.all$sex.pp) = 'Sex'
 label(desc.data.all$race.pp) = 'Race'
@@ -719,10 +721,11 @@ latex(summaryM(admit.dx ~ cohort, data = desc.data.all),
 ## -- Generate plots of descriptive statistics for each biomarker ----------------------------------
 ## Create data set of raw biomarker variables for a) all enrolled patients with biomarker,
 ##  b) all patients with biomarker + long-term outcomes
-bio.values <- all.daily[,biomarker.vnames]
+bio.values <- all.daily[all.daily$had.all.biomarkers, biomarker.vnames]
 bio.values.longterm <-
   subset(all.daily,
-         id %in% subset(all.oneobs, cog.cohort.either | func.cohort.either)$id)[,biomarker.vnames]
+         had.all.biomarkers &
+          id %in% subset(all.oneobs, cog.cohort.either | func.cohort.either)$id)[,biomarker.vnames]
 
 bio.values$cohort <- 1
 bio.values.longterm$cohort <- 2
@@ -1051,6 +1054,33 @@ model.data.func.12 <- model.data[model.data$func.cohort.12,
                                    gsub('\\.imp', '\\.first.t', biomarker.vnames),
                                    gsub('\\.imp', '\\.pctchg', biomarker.vnames),
                                    'wt.func.12')]
+
+## How many biomarker values would need to be imputed for each biomarker measurement?
+mean.sum.cog.3 <-
+  rowSums(is.na(model.data.cog.3[,gsub('\\.imp', '\\.mean\\.t', biomarker.vnames)]))
+mean.sum.cog.12 <-
+  rowSums(is.na(model.data.cog.12[,gsub('\\.imp', '\\.mean\\.t', biomarker.vnames)]))
+mean.sum.func.3 <-
+  rowSums(is.na(model.data.func.3[,gsub('\\.imp', '\\.mean\\.t', biomarker.vnames)]))
+mean.sum.func.12 <-
+  rowSums(is.na(model.data.func.12[,gsub('\\.imp', '\\.mean\\.t', biomarker.vnames)]))
+
+first.sum.cog.3 <-
+  rowSums(is.na(model.data.cog.3[,gsub('\\.imp', '\\.first\\.t', biomarker.vnames)]))
+first.sum.cog.12 <-
+  rowSums(is.na(model.data.cog.12[,gsub('\\.imp', '\\.first\\.t', biomarker.vnames)]))
+first.sum.func.3 <-
+  rowSums(is.na(model.data.func.3[,gsub('\\.imp', '\\.first\\.t', biomarker.vnames)]))
+first.sum.func.12 <-
+  rowSums(is.na(model.data.func.12[,gsub('\\.imp', '\\.first\\.t', biomarker.vnames)]))
+
+pctchg.sum.cog.3 <- rowSums(is.na(model.data.cog.3[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
+pctchg.sum.cog.12 <-
+  rowSums(is.na(model.data.cog.12[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
+pctchg.sum.func.3 <-
+  rowSums(is.na(model.data.func.3[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
+pctchg.sum.func.12 <-
+  rowSums(is.na(model.data.func.12[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
 
 ## -- If requested, recreate imputation objects; otherwise, load previously saved objects ----------
 if(rerun.imputed){
