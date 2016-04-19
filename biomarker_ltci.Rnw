@@ -1031,6 +1031,18 @@ multiplot(plotlist = wthist.list, layout = matrix(1:4, ncol = 4, byrow = TRUE))
 model.data.cog.3 <- subset(model.data, cog.cohort.3)
 model.data.cog.12 <- subset(model.data, cog.cohort.12)
 
+model.data.pctchg.cog.3 <-
+  model.data.cog.3[rowSums(!is.na(model.data.cog.3[,gsub('\\.imp',
+                                                         '\\.pctchg',
+                                                         biomarker.vnames)])) ==
+                     length(biomarker.vnames),]
+
+model.data.pctchg.cog.12 <-
+  model.data.cog.12[rowSums(!is.na(model.data.cog.12[,gsub('\\.imp',
+                                                           '\\.pctchg',
+                                                           biomarker.vnames)])) ==
+                      length(biomarker.vnames),]
+
 ## Create vector of variables to include in all imputations (covariates, outcome scores)
 always.use <- c('age.enroll', 'charlson.score', 'edu', 'iqcode.score.e', 'stroke.risk',
                 'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube', 'mean.dex.cube',
@@ -1055,6 +1067,16 @@ model.data.func.12 <- model.data[model.data$func.cohort.12,
                                    gsub('\\.imp', '\\.pctchg', biomarker.vnames),
                                    'wt.func.12')]
 
+model.data.pctchg.func.3 <-
+  model.data.func.3[rowSums(!is.na(model.data.func.3[,gsub('\\.imp', '\\.pctchg',
+                                                           biomarker.vnames)])) ==
+                      length(biomarker.vnames),]
+
+model.data.pctchg.func.12 <-
+  model.data.func.12[rowSums(!is.na(model.data.func.12[,gsub('\\.imp', '\\.pctchg',
+                                                             biomarker.vnames)])) ==
+                       length(biomarker.vnames),]
+
 ## How many biomarker values would need to be imputed for each biomarker measurement?
 mean.sum.cog.3 <-
   rowSums(is.na(model.data.cog.3[,gsub('\\.imp', '\\.mean\\.t', biomarker.vnames)]))
@@ -1074,13 +1096,14 @@ first.sum.func.3 <-
 first.sum.func.12 <-
   rowSums(is.na(model.data.func.12[,gsub('\\.imp', '\\.first\\.t', biomarker.vnames)]))
 
-pctchg.sum.cog.3 <- rowSums(is.na(model.data.cog.3[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
+pctchg.sum.cog.3 <-
+  rowSums(is.na(model.data.pctchg.cog.3[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
 pctchg.sum.cog.12 <-
-  rowSums(is.na(model.data.cog.12[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
+  rowSums(is.na(model.data.pctchg.cog.12[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
 pctchg.sum.func.3 <-
-  rowSums(is.na(model.data.func.3[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
+  rowSums(is.na(model.data.pctchg.func.3[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
 pctchg.sum.func.12 <-
-  rowSums(is.na(model.data.func.12[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
+  rowSums(is.na(model.data.pctchg.func.12[,gsub('\\.imp', '\\.pctchg', biomarker.vnames)]))
 
 ## -- If requested, recreate imputation objects; otherwise, load previously saved objects ----------
 if(rerun.imputed){
@@ -1088,11 +1111,13 @@ if(rerun.imputed){
   create.areg.obj <- function(cohort.data, marker.measure){
     areg.formula <-
       as.formula(paste0('~ ',
-                        paste(c('age.enroll', 'charlson.score', 'I(iqcode.score.e)', 'stroke.risk',
-                                'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube',
+                        paste(c('age.enroll', 'charlson.score', 'edu', 'I(iqcode.score.e)',
+                                'stroke.risk', 'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube',
                                 'I(mean.dex.cube)', 'I(mean.hal.cube)', 'icudays.sevseptic.s',
                                 'del.s.imp', 'as.numeric(frailty)', 'I(adl.e)', 'I(faq.e)',
-                                gsub('\\.imp$', paste0('.', marker.measure), biomarker.vnames)),
+                                gsub('\\.imp$', paste0('.', marker.measure), biomarker.vnames),
+                                'rbans.global.score.3', 'rbans.global.score.12',
+                                'trail.b.tscore.3', 'trail.b.tscore.12'),
                               collapse = ' + ')))
     
     set.seed(56)
@@ -1107,8 +1132,8 @@ if(rerun.imputed){
   areg.cog.mean.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'mean')
   areg.cog.first.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'first')
   areg.cog.first.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'first')
-  areg.cog.pctchg.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'pctchg')
-  areg.cog.pctchg.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'pctchg')
+  areg.cog.pctchg.3 <- create.areg.obj(model.data.pctchg.cog.3, marker.measure = 'pctchg')
+  areg.cog.pctchg.12 <- create.areg.obj(model.data.pctchg.cog.12, marker.measure = 'pctchg')
   
   ## Use mice for functional outcomes ##
   ## Create prediction matrix to use in mice() (same applies to both time points) ##
@@ -1153,9 +1178,9 @@ if(rerun.imputed){
   mice.first.12 <-
     mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.first, seed = 56)
   mice.pctchg.3 <-
-    mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
+    mice(data = model.data.pctchg.func.3, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
   mice.pctchg.12 <-
-    mice(data = model.data.func.12, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
+    mice(data = model.data.pctchg.func.12, m = 10, predictorMatrix = mice.predmat.pctchg, seed = 56)
 
   save(areg.cog.first.3, areg.cog.first.12, areg.cog.mean.3, areg.cog.mean.12, areg.cog.pctchg.3,
        areg.cog.pctchg.12, mice.first.3, mice.first.12, mice.mean.3, mice.mean.12, mice.pctchg.3,
@@ -1187,49 +1212,93 @@ covar.del.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.ben
 covar.del.func.nobio <- gsub(' + rcs(markervar, 3)', '', covar.del.func, fixed = TRUE)
 
 ## For functional outcomes, fit models without biomarker terms to use for LR test
-## ADL
-nobio.adl.nowt.3 <- with(mice.mean.3,
-                         glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
-nobio.adl.wt.3 <- with(mice.mean.3,
-                       glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
-                              weights = wt.func.3))
-nobio.adl.nowt.12 <- with(mice.mean.12,
-                          glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
-nobio.adl.wt.12 <- with(mice.mean.12,
-                        glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
-                               weights = wt.func.12))
-nobio.del.adl.nowt.3 <- with(mice.mean.3,
-                             glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
-nobio.del.adl.wt.3 <- with(mice.mean.3,
-                           glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
-                                  weights = wt.func.3))
-nobio.del.adl.nowt.12 <- with(mice.mean.12,
-                              glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
-nobio.del.adl.wt.12 <- with(mice.mean.12,
-                            glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
-                                   weights = wt.func.12))
+## ADL, mean/first
+nobio.adl.mf.nowt.3 <- with(mice.mean.3,
+                            glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
+nobio.adl.mf.wt.3 <- with(mice.mean.3,
+                          glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
+nobio.adl.mf.nowt.12 <- with(mice.mean.12,
+                             glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
+nobio.adl.mf.wt.12 <- with(mice.mean.12,
+                           glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                                  weights = wt.func.12))
+nobio.del.adl.mf.nowt.3 <- with(mice.mean.3,
+                                glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
+nobio.del.adl.mf.wt.3 <- with(mice.mean.3,
+                              glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
+nobio.del.adl.mf.nowt.12 <- with(mice.mean.12,
+                                 glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
+nobio.del.adl.mf.wt.12 <- with(mice.mean.12,
+                               glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
 
-## FAQ
-nobio.faq.nowt.3 <- with(mice.mean.3,
-                         glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
-nobio.faq.wt.3 <- with(mice.mean.3,
-                       glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
-                              weights = wt.func.3))
-nobio.faq.nowt.12 <- with(mice.mean.12,
-                          glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
-nobio.faq.wt.12 <- with(mice.mean.12,
-                        glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
-                               weights = wt.func.12))
-nobio.del.faq.nowt.3 <- with(mice.mean.3,
-                             glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
-nobio.del.faq.wt.3 <- with(mice.mean.3,
-                           glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
-                                  weights = wt.func.3))
-nobio.del.faq.nowt.12 <- with(mice.mean.12,
-                              glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
-nobio.del.faq.wt.12 <- with(mice.mean.12,
-                            glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
-                                   weights = wt.func.12))
+## ADL, percent change
+nobio.adl.pc.nowt.3 <- with(mice.pctchg.3,
+                            glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
+nobio.adl.pc.wt.3 <- with(mice.pctchg.3,
+                          glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
+nobio.adl.pc.nowt.12 <- with(mice.pctchg.12,
+                          glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
+nobio.adl.pc.wt.12 <- with(mice.pctchg.12,
+                           glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                                  weights = wt.func.12))
+nobio.del.adl.pc.nowt.3 <- with(mice.pctchg.3,
+                                glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
+nobio.del.adl.pc.wt.3 <- with(mice.pctchg.3,
+                              glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
+nobio.del.adl.pc.nowt.12 <- with(mice.pctchg.12,
+                                 glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
+nobio.del.adl.pc.wt.12 <- with(mice.pctchg.12,
+                               glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
+
+## FAQ, mean/first
+nobio.faq.mf.nowt.3 <- with(mice.mean.3,
+                            glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
+nobio.faq.mf.wt.3 <- with(mice.mean.3,
+                          glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
+nobio.faq.mf.nowt.12 <- with(mice.mean.12,
+                             glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
+nobio.faq.mf.wt.12 <- with(mice.mean.12,
+                           glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                                  weights = wt.func.12))
+nobio.del.faq.mf.nowt.3 <- with(mice.mean.3,
+                                glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
+nobio.del.faq.mf.wt.3 <- with(mice.mean.3,
+                              glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
+nobio.del.faq.mf.nowt.12 <- with(mice.mean.12,
+                                 glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
+nobio.del.faq.mf.wt.12 <- with(mice.mean.12,
+                               glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
+
+## FAQ, percent change
+nobio.faq.pc.nowt.3 <- with(mice.pctchg.3,
+                            glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
+nobio.faq.pc.wt.3 <- with(mice.pctchg.3,
+                          glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
+nobio.faq.pc.nowt.12 <- with(mice.pctchg.12,
+                             glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
+nobio.faq.pc.wt.12 <- with(mice.pctchg.12,
+                           glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                                  weights = wt.func.12))
+nobio.del.faq.pc.nowt.3 <- with(mice.pctchg.3,
+                                glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
+nobio.del.faq.pc.wt.3 <- with(mice.pctchg.3,
+                              glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
+nobio.del.faq.pc.nowt.12 <- with(mice.pctchg.12,
+                                 glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
+nobio.del.faq.pc.wt.12 <- with(mice.pctchg.12,
+                               glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
 
 ## Function to create model formulas
 make.modform <- function(outcome,
@@ -1300,19 +1369,19 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
     as.formula(make.modform('rbans.global.score.3', transmarker.pctchg, cog.covar))
   pctchg.rbans.nowt.3 <-
     fit.mult.impute(pctchg.rbans3.form, fitter = ols, xtrans = areg.cog.pctchg.3,
-                    data = model.data.cog.3)
+                    data = model.data.pctchg.cog.3)
   pctchg.rbans.wt.3 <-
     fit.mult.impute(pctchg.rbans3.form, fitter = ols.fix, xtrans = areg.cog.pctchg.3,
-                    weights = wt.cog.3, data = model.data.cog.3)
+                    weights = wt.cog.3, data = model.data.pctchg.cog.3)
 
   pctchg.rbans12.form <-
     as.formula(make.modform('rbans.global.score.12', transmarker.pctchg, cog.covar))
   pctchg.rbans.nowt.12 <-
     fit.mult.impute(pctchg.rbans12.form, fitter = ols, xtrans = areg.cog.pctchg.12,
-                    data = model.data.cog.12)
+                    data = model.data.pctchg.cog.12)
   pctchg.rbans.wt.12 <-
     fit.mult.impute(pctchg.rbans12.form, fitter = ols.fix, xtrans = areg.cog.pctchg.12,
-                    weights = wt.cog.12, data = model.data.cog.12)
+                    weights = wt.cog.12, data = model.data.pctchg.cog.12)
 
   ## Trails B T-score ##
   ## Mean vs. Trails B
@@ -1360,19 +1429,19 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
     as.formula(make.modform('trail.b.tscore.3', transmarker.pctchg, cog.covar))
   pctchg.trailb.nowt.3 <-
     fit.mult.impute(pctchg.trailb3.form, fitter = ols, xtrans = areg.cog.pctchg.3,
-                    data = model.data.cog.3)
+                    data = model.data.pctchg.cog.3)
   pctchg.trailb.wt.3 <-
     fit.mult.impute(pctchg.trailb3.form, fitter = ols.fix, xtrans = areg.cog.pctchg.3,
-                    weights = wt.cog.3, data = model.data.cog.3)
+                    weights = wt.cog.3, data = model.data.pctchg.cog.3)
 
   pctchg.trailb12.form <-
     as.formula(make.modform('trail.b.tscore.12', transmarker.pctchg, cog.covar))
   pctchg.trailb.nowt.12 <-
     fit.mult.impute(pctchg.trailb12.form, fitter = ols, xtrans = areg.cog.pctchg.12,
-                    data = model.data.cog.12)
+                    data = model.data.pctchg.cog.12)
   pctchg.trailb.wt.12 <-
     fit.mult.impute(pctchg.trailb12.form, fitter = ols.fix, xtrans = areg.cog.pctchg.12,
-                    weights = wt.cog.12, data = model.data.cog.12)
+                    weights = wt.cog.12, data = model.data.pctchg.cog.12)
 
   ## ADL score ##
   ## Mean vs. ADL score
@@ -1583,7 +1652,7 @@ if(rerun.models){
   load('run_marker_mods_objects.Rdata')
 }
 
-# ## -- Function to check linear model diagnostics ---------------------------------------------------
+## -- Function to check linear model diagnostics ---------------------------------------------------
 # check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, title.str = NULL){
 #   ## If no title.str given, set to same as out.str
 #   if(is.null(title.str)){ title.str <- out.str }
@@ -1870,75 +1939,91 @@ if(rerun.models){
 ## -- Function to get LR p-values for biomarkers from functional outcome models --------------------
 func.bio.pvals <- function(mod.list, inc.del = FALSE, use.method = c('Wald', 'likelihood')){
   if(inc.del){
-    ref.adl.nowt.3 <- nobio.del.adl.nowt.3
-    ref.adl.wt.3 <- nobio.del.adl.wt.3
-    ref.adl.nowt.12 <- nobio.del.adl.nowt.12
-    ref.adl.wt.12 <- nobio.del.adl.wt.12
-    ref.faq.nowt.3 <- nobio.del.faq.nowt.3
-    ref.faq.wt.3 <- nobio.del.faq.wt.3
-    ref.faq.nowt.12 <- nobio.del.faq.nowt.12
-    ref.faq.wt.12 <- nobio.del.faq.wt.12
+    ref.adl.mf.nowt.3 <- nobio.del.adl.mf.nowt.3
+    ref.adl.mf.wt.3 <- nobio.del.adl.mf.wt.3
+    ref.adl.mf.nowt.12 <- nobio.del.adl.mf.nowt.12
+    ref.adl.mf.wt.12 <- nobio.del.adl.mf.wt.12
+    ref.faq.mf.nowt.3 <- nobio.del.faq.mf.nowt.3
+    ref.faq.mf.wt.3 <- nobio.del.faq.mf.wt.3
+    ref.faq.mf.nowt.12 <- nobio.del.faq.mf.nowt.12
+    ref.faq.mf.wt.12 <- nobio.del.faq.mf.wt.12
+    ref.adl.pc.nowt.3 <- nobio.del.adl.pc.nowt.3
+    ref.adl.pc.wt.3 <- nobio.del.adl.pc.wt.3
+    ref.adl.pc.nowt.12 <- nobio.del.adl.pc.nowt.12
+    ref.adl.pc.wt.12 <- nobio.del.adl.pc.wt.12
+    ref.faq.pc.nowt.3 <- nobio.del.faq.pc.nowt.3
+    ref.faq.pc.wt.3 <- nobio.del.faq.pc.wt.3
+    ref.faq.pc.nowt.12 <- nobio.del.faq.pc.nowt.12
+    ref.faq.pc.wt.12 <- nobio.del.faq.pc.wt.12
   } else{
-    ref.adl.nowt.3 <- nobio.adl.nowt.3
-    ref.adl.wt.3 <- nobio.adl.wt.3
-    ref.adl.nowt.12 <- nobio.adl.nowt.12
-    ref.adl.wt.12 <- nobio.adl.wt.12
-    ref.faq.nowt.3 <- nobio.faq.nowt.3
-    ref.faq.wt.3 <- nobio.faq.wt.3
-    ref.faq.nowt.12 <- nobio.faq.nowt.12
-    ref.faq.wt.12 <- nobio.faq.wt.12
+    ref.adl.mf.nowt.3 <- nobio.adl.mf.nowt.3
+    ref.adl.mf.wt.3 <- nobio.adl.mf.wt.3
+    ref.adl.mf.nowt.12 <- nobio.adl.mf.nowt.12
+    ref.adl.mf.wt.12 <- nobio.adl.mf.wt.12
+    ref.faq.mf.nowt.3 <- nobio.faq.mf.nowt.3
+    ref.faq.mf.wt.3 <- nobio.faq.mf.wt.3
+    ref.faq.mf.nowt.12 <- nobio.faq.mf.nowt.12
+    ref.faq.mf.wt.12 <- nobio.faq.mf.wt.12
+    ref.adl.pc.nowt.3 <- nobio.adl.pc.nowt.3
+    ref.adl.pc.wt.3 <- nobio.adl.pc.wt.3
+    ref.adl.pc.nowt.12 <- nobio.adl.pc.nowt.12
+    ref.adl.pc.wt.12 <- nobio.adl.pc.wt.12
+    ref.faq.pc.nowt.3 <- nobio.faq.pc.nowt.3
+    ref.faq.pc.wt.3 <- nobio.faq.pc.wt.3
+    ref.faq.pc.nowt.12 <- nobio.faq.pc.nowt.12
+    ref.faq.pc.wt.12 <- nobio.faq.pc.wt.12
   }
 
   ## ADL ##
-  p.mean.adl.nowt.3 <- pool.compare(mod.list[['mean.adl.nowt.3']], ref.adl.nowt.3,
+  p.mean.adl.nowt.3 <- pool.compare(mod.list[['mean.adl.nowt.3']], ref.adl.mf.nowt.3,
                                     data = mice.mean.3, method = use.method)$pvalue
-  p.mean.adl.wt.3 <- pool.compare(mod.list[['mean.adl.wt.3']], ref.adl.wt.3,
+  p.mean.adl.wt.3 <- pool.compare(mod.list[['mean.adl.wt.3']], ref.adl.mf.wt.3,
                                   data = mice.mean.3, method = use.method)$pvalue
-  p.mean.adl.nowt.12 <- pool.compare(mod.list[['mean.adl.nowt.12']], ref.adl.nowt.12,
+  p.mean.adl.nowt.12 <- pool.compare(mod.list[['mean.adl.nowt.12']], ref.adl.mf.nowt.12,
                                      data = mice.mean.12, method = use.method)$pvalue
-  p.mean.adl.wt.12 <- pool.compare(mod.list[['mean.adl.wt.12']], ref.adl.wt.12,
+  p.mean.adl.wt.12 <- pool.compare(mod.list[['mean.adl.wt.12']], ref.adl.mf.wt.12,
                                    data = mice.mean.12, method = use.method)$pvalue
-  p.first.adl.nowt.3 <- pool.compare(mod.list[['first.adl.nowt.3']], ref.adl.nowt.3,
+  p.first.adl.nowt.3 <- pool.compare(mod.list[['first.adl.nowt.3']], ref.adl.mf.nowt.3,
                                      data = mice.first.3, method = use.method)$pvalue
-  p.first.adl.wt.3 <- pool.compare(mod.list[['first.adl.wt.3']], ref.adl.wt.3,
+  p.first.adl.wt.3 <- pool.compare(mod.list[['first.adl.wt.3']], ref.adl.mf.wt.3,
                                    data = mice.first.3, method = use.method)$pvalue
-  p.first.adl.nowt.12 <- pool.compare(mod.list[['first.adl.nowt.12']], ref.adl.nowt.12,
+  p.first.adl.nowt.12 <- pool.compare(mod.list[['first.adl.nowt.12']], ref.adl.mf.nowt.12,
                                       data = mice.first.12, method = use.method)$pvalue
-  p.first.adl.wt.12 <- pool.compare(mod.list[['first.adl.wt.12']], ref.adl.wt.12,
+  p.first.adl.wt.12 <- pool.compare(mod.list[['first.adl.wt.12']], ref.adl.mf.wt.12,
                                     data = mice.first.12, method = use.method)$pvalue
-  p.pctchg.adl.nowt.3 <- pool.compare(mod.list[['pctchg.adl.nowt.3']], ref.adl.nowt.3,
+  p.pctchg.adl.nowt.3 <- pool.compare(mod.list[['pctchg.adl.nowt.3']], ref.adl.pc.nowt.3,
                                       data = mice.pctchg.3, method = use.method)$pvalue
-  p.pctchg.adl.wt.3 <- pool.compare(mod.list[['pctchg.adl.wt.3']], ref.adl.wt.3,
+  p.pctchg.adl.wt.3 <- pool.compare(mod.list[['pctchg.adl.wt.3']], ref.adl.pc.wt.3,
                                     data = mice.pctchg.3, method = use.method)$pvalue
-  p.pctchg.adl.nowt.12 <- pool.compare(mod.list[['pctchg.adl.nowt.12']], ref.adl.nowt.12,
+  p.pctchg.adl.nowt.12 <- pool.compare(mod.list[['pctchg.adl.nowt.12']], ref.adl.pc.nowt.12,
                                        data = mice.pctchg.12, method = use.method)$pvalue
-  p.pctchg.adl.wt.12 <- pool.compare(mod.list[['pctchg.adl.wt.12']], ref.adl.wt.12,
+  p.pctchg.adl.wt.12 <- pool.compare(mod.list[['pctchg.adl.wt.12']], ref.adl.pc.wt.12,
                                      data = mice.pctchg.12, method = use.method)$pvalue
 
   ## FAQ ##
-  p.mean.faq.nowt.3 <- pool.compare(mod.list[['mean.faq.nowt.3']], ref.faq.nowt.3,
+  p.mean.faq.nowt.3 <- pool.compare(mod.list[['mean.faq.nowt.3']], ref.faq.mf.nowt.3,
                                     data = mice.mean.3, method = use.method)$pvalue
-  p.mean.faq.wt.3 <- pool.compare(mod.list[['mean.faq.wt.3']], ref.faq.wt.3,
+  p.mean.faq.wt.3 <- pool.compare(mod.list[['mean.faq.wt.3']], ref.faq.mf.wt.3,
                                   data = mice.mean.3, method = use.method)$pvalue
-  p.mean.faq.nowt.12 <- pool.compare(mod.list[['mean.faq.nowt.12']], ref.faq.nowt.12,
+  p.mean.faq.nowt.12 <- pool.compare(mod.list[['mean.faq.nowt.12']], ref.faq.mf.nowt.12,
                                      data = mice.mean.12, method = use.method)$pvalue
-  p.mean.faq.wt.12 <- pool.compare(mod.list[['mean.faq.wt.12']], ref.faq.wt.12,
+  p.mean.faq.wt.12 <- pool.compare(mod.list[['mean.faq.wt.12']], ref.faq.mf.wt.12,
                                    data = mice.mean.12, method = use.method)$pvalue
-  p.first.faq.nowt.3 <- pool.compare(mod.list[['first.faq.nowt.3']], ref.faq.nowt.3,
+  p.first.faq.nowt.3 <- pool.compare(mod.list[['first.faq.nowt.3']], ref.faq.mf.nowt.3,
                                      data = mice.first.3, method = use.method)$pvalue
-  p.first.faq.wt.3 <- pool.compare(mod.list[['first.faq.wt.3']], ref.faq.wt.3,
+  p.first.faq.wt.3 <- pool.compare(mod.list[['first.faq.wt.3']], ref.faq.mf.wt.3,
                                    data = mice.first.3, method = use.method)$pvalue
-  p.first.faq.nowt.12 <- pool.compare(mod.list[['first.faq.nowt.12']], ref.faq.nowt.12,
+  p.first.faq.nowt.12 <- pool.compare(mod.list[['first.faq.nowt.12']], ref.faq.mf.nowt.12,
                                       data = mice.first.12, method = use.method)$pvalue
-  p.first.faq.wt.12 <- pool.compare(mod.list[['first.faq.wt.12']], ref.faq.wt.12,
+  p.first.faq.wt.12 <- pool.compare(mod.list[['first.faq.wt.12']], ref.faq.mf.wt.12,
                                     data = mice.first.12, method = use.method)$pvalue
-  p.pctchg.faq.nowt.3 <- pool.compare(mod.list[['pctchg.faq.nowt.3']], ref.faq.nowt.3,
+  p.pctchg.faq.nowt.3 <- pool.compare(mod.list[['pctchg.faq.nowt.3']], ref.faq.pc.nowt.3,
                                       data = mice.pctchg.3, method = use.method)$pvalue
-  p.pctchg.faq.wt.3 <- pool.compare(mod.list[['pctchg.faq.wt.3']], ref.faq.wt.3,
+  p.pctchg.faq.wt.3 <- pool.compare(mod.list[['pctchg.faq.wt.3']], ref.faq.pc.wt.3,
                                     data = mice.pctchg.3, method = use.method)$pvalue
-  p.pctchg.faq.nowt.12 <- pool.compare(mod.list[['pctchg.faq.nowt.12']], ref.faq.nowt.12,
+  p.pctchg.faq.nowt.12 <- pool.compare(mod.list[['pctchg.faq.nowt.12']], ref.faq.pc.nowt.12,
                                        data = mice.pctchg.12, method = use.method)$pvalue
-  p.pctchg.faq.wt.12 <- pool.compare(mod.list[['pctchg.faq.wt.12']], ref.faq.wt.12,
+  p.pctchg.faq.wt.12 <- pool.compare(mod.list[['pctchg.faq.wt.12']], ref.faq.pc.wt.12,
                                      data = mice.pctchg.12, method = use.method)$pvalue
 
   return(list('p.mean.adl.nowt.3' = p.mean.adl.nowt.3,
