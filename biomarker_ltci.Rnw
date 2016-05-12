@@ -800,18 +800,18 @@ bio.hist <- function(dataset = bio.summary.cohorts, ## data set to use
                              na.rm = TRUE) })))
     colnames(use.stats)[ncol(use.stats)] <- 'nimp'
   }
-  
+
   ## Add descriptive statistics to X axis title
   if(add.desc){
-    
+
     add.x <- NULL
-    
+
     if(desc.oneline){
       desc.sep <- '; '
     } else{
       desc.sep <- '\n'
     }
-    
+
     ## For number of measurements, add N (%) for 1/2/3 for each cohort
     if(plot.n){
       bio.pcts <- do.call(cbind,
@@ -821,7 +821,7 @@ bio.hist <- function(dataset = bio.summary.cohorts, ## data set to use
       n.pct <- paste0(bio.pcts, '% (', use.stats, ')')
       which.cohort <-
         unlist(lapply(1:ncol(use.stats), FUN = function(c){ rep(c, nrow(use.stats)) }))
-      
+
       add.x <-
         do.call(paste,
                 list(lapply(1:ncol(use.stats), FUN = function(c){
@@ -854,7 +854,7 @@ bio.hist <- function(dataset = bio.summary.cohorts, ## data set to use
     }
     xtitle <- paste(xtitle, add.x, sep = '\n\n')
   }
-  
+
   ## Initialize plot object: all plots are faceted by cohort, have same Y label
   plot.obj <- ggplot(data = dataset, aes_string(x = bio.var)) +
     facet_wrap(~ cohort) +
@@ -864,7 +864,7 @@ bio.hist <- function(dataset = bio.summary.cohorts, ## data set to use
           axis.title = element_text(size = axis.title.size),
           strip.text = element_text(size = strip.text.size),
           plot.title = element_text(hjust = -0.05, face = 'bold', size = 20))
-  
+
   ## Use geom_bar for N since three completely discrete categories; for everything else, histogram
   if(plot.n){
     plot.obj <- plot.obj +
@@ -875,12 +875,12 @@ bio.hist <- function(dataset = bio.summary.cohorts, ## data set to use
       geom_histogram(fill = 'navy') +
       xlab(xtitle)
   }
-  
+
   ## Add main title if desired (built to be one main title for entire page)
   if(!is.null(maintitle)){
     plot.obj <- plot.obj + ggtitle(maintitle)
   }
-  
+
   ## Add reference line for lower limit of detection, if desired
   if(add.lld){
     plot.obj <- plot.obj +
@@ -903,7 +903,7 @@ bio.plots <- function(which.bio){
   n.plot <-
     bio.hist(bio.name = which.bio, bio.stat = 'n', xtitle = 'Measurements Per Patient',
              add.lld = FALSE, maintitle = ' ')
-  
+
   return(list('raw.plot' = raw.plot,
               'mean.plot' = mean.plot,
               'first.plot' = first.plot,
@@ -1119,7 +1119,7 @@ if(rerun.imputed){
                                 'rbans.global.score.3', 'rbans.global.score.12',
                                 'trail.b.tscore.3', 'trail.b.tscore.12'),
                               collapse = ' + ')))
-    
+
     set.seed(56)
     do.call('aregImpute',
             list(formula = areg.formula,
@@ -1127,14 +1127,14 @@ if(rerun.imputed){
                  nk = 3,
                  data = cohort.data))
   }
-  
+
   areg.cog.mean.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'mean')
   areg.cog.mean.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'mean')
   areg.cog.first.3 <- create.areg.obj(model.data.cog.3, marker.measure = 'first')
   areg.cog.first.12 <- create.areg.obj(model.data.cog.12, marker.measure = 'first')
   areg.cog.pctchg.3 <- create.areg.obj(model.data.pctchg.cog.3, marker.measure = 'pctchg')
   areg.cog.pctchg.12 <- create.areg.obj(model.data.pctchg.cog.12, marker.measure = 'pctchg')
-  
+
   ## Use mice for functional outcomes ##
   ## Create prediction matrix to use in mice() (same applies to both time points) ##
   ## Create vector that is all 1s; function will replace diagonal and unused biomarker measures
@@ -1145,29 +1145,29 @@ if(rerun.imputed){
     tmpmat <- do.call(rbind,
                       lapply(names(model.data.func.3), FUN = function(x){
                         tmp2 <- tmp
-                        
+
                         ## Which marker measures are *not* being used?
                         not.used <- setdiff(c('mean', 'first', 'pctchg'), marker.measure)
                         not.used <- gsub('mean', 'mean\\.t', not.used)
                         not.used <- gsub('first', 'first\\.t', not.used)
-                        
+
                         replace.vars <-
                           unique(c(x,
                                    gsub('\\.imp', paste0('\\.', not.used[1]), biomarker.vnames),
                                    gsub('\\.imp', paste0('\\.', not.used[2]), biomarker.vnames)))
-                        
+
                         tmp2[replace.vars] <- 0
                         return(tmp2)
                       }))
-    
+
     rownames(tmpmat) <- colnames(tmpmat) <- names(model.data.func.3)
     return(tmpmat)
   }
-  
+
   mice.predmat.mean <- create.mice.predmat('mean')
   mice.predmat.first <- create.mice.predmat('first')
   mice.predmat.pctchg <- create.mice.predmat('pctchg')
-  
+
   ## Create mice object for each biomarker measure
   mice.mean.3 <-
     mice(data = model.data.func.3, m = 10, predictorMatrix = mice.predmat.mean, seed = 56)
@@ -1186,7 +1186,7 @@ if(rerun.imputed){
        areg.cog.pctchg.12, mice.first.3, mice.first.12, mice.mean.3, mice.mean.12, mice.pctchg.3,
        mice.pctchg.12, mice.predmat.mean, mice.predmat.pctchg,
        file = 'imputation_objects.Rdata')
-  
+
 } else{
   load('imputation_objects.Rdata')
 }
@@ -1204,101 +1204,116 @@ covar.del.cog <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rc
 
 ## Functional outcomes
 ## Delirium *not* included
-covar.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + rcs(markervar, 3)"
+covar.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + rcs(markervar, 3) | age.enroll + adl.e"
 covar.func.nobio <- gsub(' + rcs(markervar, 3)', '', covar.func, fixed = TRUE)
 
 ## Delirium included
-covar.del.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + del.s.imp + rcs(markervar, 3)"
+covar.del.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + del.s.imp + rcs(markervar, 3) | age.enroll + adl.e"
 covar.del.func.nobio <- gsub(' + rcs(markervar, 3)', '', covar.del.func, fixed = TRUE)
 
 ## For functional outcomes, fit models without biomarker terms to use for LR test
 ## ADL, mean/first
 nobio.adl.mf.nowt.3 <- with(mice.mean.3,
-                            glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
+                            zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                     dist = 'negbin'))
 nobio.adl.mf.wt.3 <- with(mice.mean.3,
-                          glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
-                                 weights = wt.func.3))
+                          zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                   weights = wt.func.3, dist = 'negbin'))
 nobio.adl.mf.nowt.12 <- with(mice.mean.12,
-                             glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
+                             zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                                      dist = 'negbin'))
 nobio.adl.mf.wt.12 <- with(mice.mean.12,
-                           glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
-                                  weights = wt.func.12))
+                           zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                                    weights = wt.func.12, dist = 'negbin'))
 nobio.del.adl.mf.nowt.3 <- with(mice.mean.3,
-                                glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
+                                zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                         dist = 'negbin'))
 nobio.del.adl.mf.wt.3 <- with(mice.mean.3,
-                              glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
-                                     weights = wt.func.3))
+                              zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                       weights = wt.func.3, dist = 'negbin'))
 nobio.del.adl.mf.nowt.12 <- with(mice.mean.12,
-                                 glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
+                                 zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                          dist = 'negbin'))
 nobio.del.adl.mf.wt.12 <- with(mice.mean.12,
-                               glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
-                                      weights = wt.func.12))
+                               zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                        weights = wt.func.12, dist = 'negbin'))
 
 ## ADL, percent change
 nobio.adl.pc.nowt.3 <- with(mice.pctchg.3,
-                            glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
+                            zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                     dist = 'negbin'))
 nobio.adl.pc.wt.3 <- with(mice.pctchg.3,
-                          glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
-                                 weights = wt.func.3))
+                          zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                   weights = wt.func.3, dist = 'negbin'))
 nobio.adl.pc.nowt.12 <- with(mice.pctchg.12,
-                          glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
+                          zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                                   dist = 'negbin'))
 nobio.adl.pc.wt.12 <- with(mice.pctchg.12,
-                           glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
-                                  weights = wt.func.12))
+                           zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                                    weights = wt.func.12, dist = 'negbin'))
 nobio.del.adl.pc.nowt.3 <- with(mice.pctchg.3,
-                                glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
+                                zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                         dist = 'negbin'))
 nobio.del.adl.pc.wt.3 <- with(mice.pctchg.3,
-                              glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
-                                     weights = wt.func.3))
+                              zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                       weights = wt.func.3, dist = 'negbin'))
 nobio.del.adl.pc.nowt.12 <- with(mice.pctchg.12,
-                                 glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
+                                 zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                          dist = 'negbin'))
 nobio.del.adl.pc.wt.12 <- with(mice.pctchg.12,
-                               glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
-                                      weights = wt.func.12))
+                               zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                        weights = wt.func.12, dist = 'negbin'))
 
 ## FAQ, mean/first
 nobio.faq.mf.nowt.3 <- with(mice.mean.3,
-                            glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
+                            zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                     dist = 'negbin'))
 nobio.faq.mf.wt.3 <- with(mice.mean.3,
-                          glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
-                                 weights = wt.func.3))
+                          zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                   weights = wt.func.3, dist = 'negbin'))
 nobio.faq.mf.nowt.12 <- with(mice.mean.12,
-                             glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
+                             zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
 nobio.faq.mf.wt.12 <- with(mice.mean.12,
-                           glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
-                                  weights = wt.func.12))
+                           zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                                    weights = wt.func.12, dist = 'negbin'))
 nobio.del.faq.mf.nowt.3 <- with(mice.mean.3,
-                                glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
+                                zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                         dist = 'negbin'))
 nobio.del.faq.mf.wt.3 <- with(mice.mean.3,
-                              glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
-                                     weights = wt.func.3))
+                              zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                       weights = wt.func.3, dist = 'negbin'))
 nobio.del.faq.mf.nowt.12 <- with(mice.mean.12,
-                                 glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
+                                 zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                          dist = 'negbin'))
 nobio.del.faq.mf.wt.12 <- with(mice.mean.12,
-                               glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
-                                      weights = wt.func.12))
+                               zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                        weights = wt.func.12, dist = 'negbin'))
 
 ## FAQ, percent change
 nobio.faq.pc.nowt.3 <- with(mice.pctchg.3,
-                            glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
+                            zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                     dist = 'negbin'))
 nobio.faq.pc.wt.3 <- with(mice.pctchg.3,
-                          glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
-                                 weights = wt.func.3))
+                          zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                   weights = wt.func.3, dist = 'negbin'))
 nobio.faq.pc.nowt.12 <- with(mice.pctchg.12,
-                             glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
+                             zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                                      dist = 'negbin'))
 nobio.faq.pc.wt.12 <- with(mice.pctchg.12,
-                           glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
-                                  weights = wt.func.12))
+                           zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                                    weights = wt.func.12, dist = 'negbin'))
 nobio.del.faq.pc.nowt.3 <- with(mice.pctchg.3,
-                                glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
+                                zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                         dist = 'negbin'))
 nobio.del.faq.pc.wt.3 <- with(mice.pctchg.3,
-                              glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
-                                     weights = wt.func.3))
+                              zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                       weights = wt.func.3, dist = 'negbin'))
 nobio.del.faq.pc.nowt.12 <- with(mice.pctchg.12,
-                                 glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
+                                 zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                          dist = 'negbin'))
 nobio.del.faq.pc.wt.12 <- with(mice.pctchg.12,
-                               glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
-                                      weights = wt.func.12))
+                               zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                        weights = wt.func.12, dist = 'negbin'))
 
 ## Function to create model formulas
 make.modform <- function(outcome,
@@ -1447,92 +1462,104 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   ## Mean vs. ADL score
   mean.adl3.formula <- make.modform('adl.totscore.3', transmarker.mean, func.covar)
   mean.adl.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s))", mean.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, dist = 'negbin'))",
+                              mean.adl3.formula)))
   mean.adl.wt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s, weights = wt.func.3))",
+    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
                               mean.adl3.formula)))
 
   mean.adl12.formula <- make.modform('adl.totscore.12', transmarker.mean, func.covar)
   mean.adl.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s))", mean.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, dist = 'negbin'))",
+                              mean.adl12.formula)))
   mean.adl.wt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s, weights = wt.func.12))",
+    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
                               mean.adl12.formula)))
 
   ## First vs. ADL
   first.adl3.formula <- make.modform('adl.totscore.3', transmarker.first, func.covar)
   first.adl.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s))", first.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, dist = 'negbin'))",
+                              first.adl3.formula)))
   first.adl.wt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s, weights = wt.func.3))",
+    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
                               first.adl3.formula)))
 
   first.adl12.formula <- make.modform('adl.totscore.12', transmarker.first, func.covar)
   first.adl.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s))", first.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, dist = 'negbin'))",
+                              first.adl12.formula)))
   first.adl.wt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s, weights = wt.func.12))",
+    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
                               first.adl12.formula)))
 
   ## % change vs. ADL
   pctchg.adl3.formula <- make.modform('adl.totscore.3', transmarker.pctchg, func.covar)
   pctchg.adl.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s))", pctchg.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, dist = 'negbin'))",
+                              pctchg.adl3.formula)))
   pctchg.adl.wt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s, weights = wt.func.3))",
+    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
                               pctchg.adl3.formula)))
 
   pctchg.adl12.formula <- make.modform('adl.totscore.12', transmarker.pctchg, func.covar)
   pctchg.adl.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s))", pctchg.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, dist = 'negbin'))",
+                              pctchg.adl12.formula)))
   pctchg.adl.wt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s, weights = wt.func.12))",
+    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
                               pctchg.adl12.formula)))
 
   ## FAQ score ##
   ## Mean vs. FAQ score
   mean.faq3.formula <- make.modform('faq.rdscore.3', transmarker.mean, func.covar)
   mean.faq.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s))", mean.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, dist = 'negbin'))",
+                              mean.faq3.formula)))
   mean.faq.wt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s, weights = wt.func.3))",
+    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
                               mean.faq3.formula)))
 
   mean.faq12.formula <- make.modform('faq.rdscore.12', transmarker.mean, func.covar)
   mean.faq.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s))", mean.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, dist = 'negbin'))",
+                              mean.faq12.formula)))
   mean.faq.wt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s, weights = wt.func.12))",
+    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
                               mean.faq12.formula)))
 
   ## First vs. FAQ
   first.faq3.formula <- make.modform('faq.rdscore.3', transmarker.first, func.covar)
   first.faq.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s))", first.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, dist = 'negbin'))",
+                              first.faq3.formula)))
   first.faq.wt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s, weights = wt.func.3))",
+    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
                               first.faq3.formula)))
 
   first.faq12.formula <- make.modform('faq.rdscore.12', transmarker.first, func.covar)
   first.faq.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s))", first.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, dist = 'negbin'))",
+                              first.faq12.formula)))
   first.faq.wt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s, weights = wt.func.12))",
+    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
                               first.faq12.formula)))
 
   ## % change vs. FAQ
   pctchg.faq3.formula <- make.modform('faq.rdscore.3', transmarker.pctchg, func.covar)
   pctchg.faq.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s))", pctchg.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, dist = 'negbin'))",
+                              pctchg.faq3.formula)))
   pctchg.faq.wt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s, weights = wt.func.3))",
+    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
                               pctchg.faq3.formula)))
 
   pctchg.faq12.formula <- make.modform('faq.rdscore.12', transmarker.pctchg, func.covar)
   pctchg.faq.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s))", pctchg.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, dist = 'negbin'))",
+                              pctchg.faq12.formula)))
   pctchg.faq.wt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s, weights = wt.func.12))",
+    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
                               pctchg.faq12.formula)))
 
   return(list('mean.rbans.nowt.3' = mean.rbans.nowt.3,
@@ -1599,8 +1626,8 @@ if(rerun.models){
   proteinc.mods <- run.marker.mods('proteinc')
   tnfa.mods <- run.marker.mods('tnfa')
   tnfr1.mods <- run.marker.mods('tnfr1')
-  
-  
+
+
   ## Models with delirium
   crp.del.mods <- run.marker.mods('crp',
                                   cog.covar = covar.del.cog,
@@ -1635,7 +1662,7 @@ if(rerun.models){
   tnfr1.del.mods <- run.marker.mods('tnfr1',
                                     cog.covar = covar.del.cog,
                                     func.covar = covar.del.func)
-  
+
   save(crp.mods, crp.del.mods,
        ifngamma.mods, ifngamma.del.mods,
        il10.mods, il10.del.mods,
@@ -2052,7 +2079,7 @@ func.bio.pvals <- function(mod.list, inc.del = FALSE, use.method = c('Wald', 'li
               'p.pctchg.faq.wt.12' = p.pctchg.faq.wt.12))
 }
 
-use.this.method <- 'likelihood'
+use.this.method <- 'Wald'
 
 crp.func.pvals <- func.bio.pvals(mod.list = crp.mods, use.method = use.this.method)
 ifngamma.func.pvals <- func.bio.pvals(mod.list = ifngamma.mods, use.method = use.this.method)
@@ -2171,29 +2198,84 @@ formatp <- function(val){
 dd <- datadist(model.data); options(datadist = 'dd')
 
 ## -- Function to create results table ------------------------------------------------------------
+## -- Function to create results table ------------------------------------------------------------
 create.results.table <- function(modlist, ## List of model objects (eg, crp.mods)
                                  marker,  ## string with marker prefix (eg, 'crp')
-                                 test){   ## string indicating test of interest (eg, 'rbans')
+                                 test,    ## string indicating test of interest (eg, 'rbans')
+                                 pval.list = NULL){ ## list of p-values for functional outcomes
 
-  ## Create initial data frame with results from summary(), anova() for biomarker rows only
-  ## For all models in model list with names containing "test",
-  ##  take rows of summary() and anova() with rownames containing biomarker;
-  ##  concatenate with name of model (eg, "mean.rbans.nowt.3")
-  results.data <-
-    as.data.frame(do.call(rbind,
-                          lapply(grep(test, names(modlist)), FUN = function(x){
-                            mod.n <- ifelse(test %in% c('rbans', 'trailb'),
-                                            modlist[[x]]$stats['n'],
-                                            nrow(modlist[[x]]$analyses[[1]]$model))
-                            take.row.sum <- grep(marker, rownames(summary(modlist[[x]])))
-                            take.row.anova <- grep(marker, rownames(anova(modlist[[x]])))
-                            c(names(modlist)[x],
-                              mod.n,
-                              summary(modlist[[x]])[take.row.sum,
-                                                    c('Low', 'High', 'Effect',
-                                                      'Lower 0.95', 'Upper 0.95')],
-                              anova(modlist[[x]])[take.row.anova, 'P'])
-                          })))
+  if(test %in% c('rbans', 'trailb')){
+    ## Create initial data frame with results from summary(), anova() for biomarker rows only
+    ## For all models in model list with names containing "test",
+    ##  take rows of summary() and anova() with rownames containing biomarker;
+    ##  concatenate with name of model (eg, "mean.rbans.nowt.3")
+    results.data <-
+      as.data.frame(do.call(rbind,
+                            lapply(grep(test, names(modlist)), FUN = function(x){
+                              mod.n <- ifelse(test %in% c('rbans', 'trailb'),
+                                              modlist[[x]]$stats['n'],
+                                              nrow(modlist[[x]]$analyses[[1]]$model))
+                              take.row.sum <- grep(marker, rownames(summary(modlist[[x]])))
+                              take.row.anova <- grep(marker, rownames(anova(modlist[[x]])))
+                              c(names(modlist)[x],
+                                mod.n,
+                                summary(modlist[[x]])[take.row.sum,
+                                                      c('Low', 'High', 'Effect',
+                                                        'Lower 0.95', 'Upper 0.95')],
+                                anova(modlist[[x]])[take.row.anova, 'P'])
+                            })))
+
+  } else if(test %in% c('adl', 'faq')){
+    results.data <-
+      as.data.frame(do.call(rbind,
+                            lapply(grep(test, names(modlist)), FUN = function(x){
+                              ## Get N used in model
+                              mod.n <- ifelse(test %in% c('rbans', 'trailb'),
+                                              modlist[[x]]$stats['n'],
+                                              nrow(modlist[[x]]$analyses[[1]]$model))
+
+                              ## Which biomarker variable are we using?
+                              which.biovar <- grep(paste0('^', marker, '[a-z.]+$'),
+                                                   unlist(strsplit(grep(marker,
+                                                                        names(pool(modlist[[x]])$qbar),
+                                                                        value = TRUE),
+                                                                   ')')),
+                                                   value = TRUE)
+
+                              ## Get reference and comparison values
+                              ref.val <- dd$limits['Low:effect', which.biovar]
+                              comp.val <- dd$limits['High:effect', which.biovar]
+
+                              ## Get coefficients, vcov matrix to use to calculate RR/CI
+                              mod.coef <- pool(modlist[[x]])$qbar
+                              mod.vcov <- pool(modlist[[x]])$ubar
+
+                              ## Get knots to use for nonlinear terms
+                              bio.knots <- eval(parse(text = paste0('rcspline.eval(',
+                                                                    as.character(modlist[[x]]$call1[2]),
+                                                                    '$',
+                                                                    which.biovar,
+                                                                    ', nk = 3, knots.only = TRUE)')))
+                              bio.knot.list <- list(bio.knots)
+                              names(bio.knot.list) <- paste0('count_', which.biovar)
+
+                              mod.peci <-
+                                calc.ratioci(modcoefs = mod.coef,
+                                             modvcov = mod.vcov,
+                                             ratiovar = paste0('count_', which.biovar),
+                                             ratiovals = c(ref.val, comp.val),
+                                             use.knots = bio.knot.list)
+
+                              c(names(modlist)[x],
+                                mod.n,
+                                ref.val,
+                                comp.val,
+                                mod.peci['pointest'],
+                                mod.peci['lcl'],
+                                mod.peci['ucl'],
+                                pval.list[[paste0('p.', names(modlist)[x])]])
+                            })))
+  }
 
   ## Set names of resulting data frame; make all variables numeric except model name
   names(results.data) <-
@@ -2214,7 +2296,7 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
     unique() %>%
     spread(key = time, value = n)
   names(n.data)[-3] <- paste0('n.', names(n.data)[-3])
-  
+
   results.data <- results.data %>%
     dplyr::select(-n) %>%
     separate(which.mod, into = c('measure', 'test', 'weight', 'time')) %>%
@@ -2535,7 +2617,7 @@ completing all cognitive testing.
 All models included the following covariates; with the exception of dexmedetomidine and haloperidol,
 which had too few unique values, all continuous variables (including biomarker) were allowed to have
 a nonlinear association with the outcome using restricted cubic splines. Mean and first biomarker
-were transformed by taking the base 10 logarithm, so that extremely high values did not cause 
+were transformed by taking the base 10 logarithm, so that extremely high values did not cause
 problems with model convergence.
 
 \begin{itemize}
