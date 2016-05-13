@@ -149,22 +149,16 @@ if(Sys.info()['sysname'] == 'Darwin'){
   if(length(grep('Volumes', getwd())) > 0){
     load('/Volumes/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
     source('/Volumes/thomps23/R/multiplot.r')
-    source('/Volumes/thomps23/R/rmsHelpers/model_results.R')
-    source('/Volumes/thomps23/R/rmsHelpers/combine_cohorts.R')
-    source('/Volumes/thomps23/R/rmsHelpers/latex_rms_results.R')
+    source('/Volumes/thomps23/R/JTMisc/calc_ratioci.R')
   } else{
     load('braindata.Rdata')
     source('multiplot.r')
-    source('model_results.R')
-    source('combine_cohorts.R')
-    source('latex_rms_results.R')
+    source('calc_ratioci.R')
   }
 } else{
   load('/home/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
   source('/home/thomps23/R/multiplot.r')
-  source('/home/thomps23/R/rmsHelpers/model_results.R')
-  source('/home/thomps23/R/rmsHelpers/combine_cohorts.R')
-  source('/home/thomps23/R/rmsHelpers/latex_rms_results.R')
+  source('/home/thomps23/R/JTMisc/calc_ratioci.R')
 }
 
 ## -- Insert data management to combine BRAIN, MIND data sets --------------------------------------
@@ -1676,7 +1670,7 @@ if(rerun.models){
        tnfr1.mods, tnfr1.del.mods,
        file = 'run_marker_mods_objects.Rdata')
 } else{
-  load('run_marker_mods_objects.Rdata')
+  load('/Users/jthompson/run_marker_mods_objects.Rdata')
 }
 
 ## -- Function to check linear model diagnostics ---------------------------------------------------
@@ -2198,7 +2192,6 @@ formatp <- function(val){
 dd <- datadist(model.data); options(datadist = 'dd')
 
 ## -- Function to create results table ------------------------------------------------------------
-## -- Function to create results table ------------------------------------------------------------
 create.results.table <- function(modlist, ## List of model objects (eg, crp.mods)
                                  marker,  ## string with marker prefix (eg, 'crp')
                                  test,    ## string indicating test of interest (eg, 'rbans')
@@ -2248,7 +2241,7 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
 
                               ## Get coefficients, vcov matrix to use to calculate RR/CI
                               mod.coef <- pool(modlist[[x]])$qbar
-                              mod.vcov <- pool(modlist[[x]])$ubar
+                              mod.vcov <- pool(modlist[[x]])$t
 
                               ## Get knots to use for nonlinear terms
                               bio.knots <- eval(parse(text = paste0('rcspline.eval(',
@@ -2324,58 +2317,147 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
 ## Without delirium
 crp.rbans.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'rbans')
 crp.trailb.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'trailb')
+crp.adl.results <-
+  create.results.table(modlist = crp.mods, marker = 'crp', 'adl', pval.list = crp.func.pvals)
+crp.faq.results <-
+  create.results.table(modlist = crp.mods, marker = 'crp', 'faq', pval.list = crp.func.pvals)
 ifngamma.rbans.results <-
   create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'rbans')
 ifngamma.trailb.results <-
   create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'trailb')
+ifngamma.adl.results <- create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'adl',
+                                             pval.list = ifngamma.func.pvals)
+ifngamma.faq.results <- create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'faq',
+                                             pval.list = ifngamma.func.pvals)
 il10.rbans.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'rbans')
 il10.trailb.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'trailb')
+il10.adl.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'adl',
+                                         pval.list = il10.func.pvals)
+il10.faq.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'faq',
+                                         pval.list = il10.func.pvals)
 il12.rbans.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'rbans')
 il12.trailb.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'trailb')
+il12.adl.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'adl',
+                                         pval.list = il12.func.pvals)
+il12.faq.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'faq',
+                                         pval.list = il12.func.pvals)
 il1b.rbans.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'rbans')
 il1b.trailb.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'trailb')
+il1b.adl.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'adl',
+                                         pval.list = il1b.func.pvals)
+il1b.faq.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'faq',
+                                         pval.list = il1b.func.pvals)
 il6.rbans.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'rbans')
 il6.trailb.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'trailb')
+il6.adl.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'adl',
+                                        pval.list = il6.func.pvals)
+il6.faq.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'faq',
+                                        pval.list = il6.func.pvals)
 il8.rbans.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'rbans')
 il8.trailb.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'trailb')
+il8.adl.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'adl',
+                                        pval.list = il8.func.pvals)
+il8.faq.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'faq',
+                                        pval.list = il8.func.pvals)
 mmp9.rbans.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'rbans')
 mmp9.trailb.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'trailb')
+mmp9.adl.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'adl',
+                                         pval.list = mmp9.func.pvals)
+mmp9.faq.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'faq',
+                                         pval.list = mmp9.func.pvals)
 proteinc.rbans.results <-
   create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'rbans')
 proteinc.trailb.results <-
   create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'trailb')
+proteinc.adl.results <- create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'adl',
+                                             pval.list = proteinc.func.pvals)
+proteinc.faq.results <- create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'faq',
+                                             pval.list = proteinc.func.pvals)
 tnfa.rbans.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'rbans')
 tnfa.trailb.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'trailb')
+tnfa.adl.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'adl',
+                                         pval.list = tnfa.func.pvals)
+tnfa.faq.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'faq',
+                                         pval.list = tnfa.func.pvals)
 tnfr1.rbans.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'rbans')
 tnfr1.trailb.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'trailb')
+tnfr1.adl.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'adl',
+                                          pval.list = tnfr1.func.pvals)
+tnfr1.faq.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'faq',
+                                          pval.list = tnfr1.func.pvals)
 
 ## With delirium
 crp.del.rbans.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'rbans')
 crp.del.trailb.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'trailb')
+crp.del.adl.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'adl',
+                                            pval.list = crp.del.func.pvals)
+crp.del.faq.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'faq',
+                                            pval.list = crp.del.func.pvals)
 ifngamma.del.rbans.results <-
   create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma', 'rbans')
 ifngamma.del.trailb.results <-
   create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma', 'trailb')
+ifngamma.del.adl.results <- create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma',
+                                                 'adl', pval.list = ifngamma.del.func.pvals)
+ifngamma.del.faq.results <- create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma',
+                                                 'faq', pval.list = ifngamma.del.func.pvals)
 il10.del.rbans.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'rbans')
 il10.del.trailb.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'trailb')
+il10.del.adl.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'adl',
+                                             pval.list = il10.del.func.pvals)
+il10.del.faq.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'faq',
+                                             pval.list = il10.del.func.pvals)
 il12.del.rbans.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'rbans')
 il12.del.trailb.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'trailb')
+il12.del.adl.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'adl',
+                                             pval.list = il12.del.func.pvals)
+il12.del.faq.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'faq',
+                                             pval.list = il12.del.func.pvals)
 il1b.del.rbans.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'rbans')
 il1b.del.trailb.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'trailb')
+il1b.del.adl.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'adl',
+                                             pval.list = il1b.del.func.pvals)
+il1b.del.faq.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'faq',
+                                             pval.list = il1b.del.func.pvals)
 il6.del.rbans.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'rbans')
 il6.del.trailb.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'trailb')
+il6.del.adl.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'adl',
+                                            pval.list = il6.del.func.pvals)
+il6.del.faq.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'faq',
+                                            pval.list = il6.del.func.pvals)
 il8.del.rbans.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'rbans')
 il8.del.trailb.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'trailb')
+il8.del.adl.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'adl',
+                                            pval.list = il8.del.func.pvals)
+il8.del.faq.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'faq',
+                                            pval.list = il8.del.func.pvals)
 mmp9.del.rbans.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'rbans')
 mmp9.del.trailb.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'trailb')
+mmp9.del.adl.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'adl',
+                                             pval.list = mmp9.del.func.pvals)
+mmp9.del.faq.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'faq',
+                                             pval.list = mmp9.del.func.pvals)
 proteinc.del.rbans.results <-
   create.results.table(modlist = proteinc.del.mods, marker = 'proteinc', 'rbans')
 proteinc.del.trailb.results <-
   create.results.table(modlist = proteinc.del.mods, marker = 'proteinc', 'trailb')
+proteinc.del.adl.results <- create.results.table(modlist = proteinc.del.mods, marker = 'proteinc',
+                                                 'adl', pval.list = proteinc.del.func.pvals)
+proteinc.del.faq.results <- create.results.table(modlist = proteinc.del.mods, marker = 'proteinc',
+                                                 'faq', pval.list = proteinc.del.func.pvals)
 tnfa.del.rbans.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'rbans')
 tnfa.del.trailb.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'trailb')
+tnfa.del.adl.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'adl',
+                                             pval.list = tnfa.del.func.pvals)
+tnfa.del.faq.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'faq',
+                                             pval.list = tnfa.del.func.pvals)
 tnfr1.del.rbans.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'rbans')
 tnfr1.del.trailb.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'trailb')
+tnfr1.del.adl.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'adl',
+                                              pval.list = tnfr1.del.func.pvals)
+tnfr1.del.faq.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'faq',
+                                              pval.list = tnfr1.del.func.pvals)
+
 
 ## -- Function to print results tables in Latex ----------------------------------------------------
 latex.results <- function(resultsdata, markerstr, teststr){
@@ -2672,8 +2754,8 @@ multiplot(cogresults.plot(modlist = crp.mods, test = 'trailb', marker = 'crp',
 \subsection{IFN-$\gamma$}
 \subsubsection{RBANS}
 <<printifngammarbanstables, results='asis'>>=
-latex.results(ifngamma.rbans.results, 'ifngamma', 'RBANS Global Scores, Models Without Delirium')
-latex.results(ifngamma.del.rbans.results, 'ifngamma', 'RBANS Global Scores, Models With Delirium')
+latex.results(ifngamma.rbans.results, 'IFN-gamma', 'RBANS Global Scores, Models Without Delirium')
+latex.results(ifngamma.del.rbans.results, 'IFN-gamma', 'RBANS Global Scores, Models With Delirium')
 @
 
 \clearpage
@@ -2724,8 +2806,8 @@ multiplot(cogresults.plot(modlist = il10.mods, test = 'rbans', marker = 'il10',
 \clearpage
 \subsubsection{Trails B}
 <<printil10trailbtables, results='asis'>>=
-latex.results(il10.trailb.results, 'il10', 'Trails B T-Scores, Models Without Delirium')
-latex.results(il10.del.trailb.results, 'il10', 'Trails B T-Scores, Models With Delirium')
+latex.results(il10.trailb.results, 'Il10', 'Trails B T-Scores, Models Without Delirium')
+latex.results(il10.del.trailb.results, 'Il10', 'Trails B T-Scores, Models With Delirium')
 @
 
 \clearpage
@@ -3019,9 +3101,9 @@ multiplot(cogresults.plot(modlist = tnfr1.mods, test = 'trailb', marker = 'tnfr1
 
 \clearpage
 \section{Biomarkers vs. Long-Term Functional Outcomes}
-We used negative binomial regression to examine the relationships between biomarkers, measured
-three different ways, and Katz ADL and FAQ scores at 3- and 12-month followup. P-values are
-calculated using the likelihood method, comparing models with the biomarker terms to models without
+We used zero-inflated negative binomial regression to examine the relationships between biomarkers,
+measured three different ways, and Katz ADL and FAQ scores at 3- and 12-month followup. P-values are
+calculated using the Wald method, comparing models with the biomarker terms to models without
 those terms (but including all other covariates).
 
 All patients who had at least one day of complete biomarker data in the ICU and at least partial
@@ -3033,10 +3115,11 @@ we do use multiple imputation to impute other missing covariates and to impute m
 outcome data. Multiple imputation helps reduce bias; in our case, bias would likely come from the
 sickest patients (ie, most likely to score poorly) not completing all functional testing.
 
-All models included the following covariates; all covariates are forced to be linear except for the
-biomarkers, which are allowed to have a nonlinear relationship with the outcome using restricted
-cubic splines. Mean and first biomarker were transformed by taking the base 10 logarithm, so that
-extremely high values did not cause problems with model convergence.
+The zero-inflation portion of each model included age and baseline ADL scores. All models included
+the following covariates in the count piece of the model; all covariates are forced to be linear
+except for the biomarkers, which are allowed to have a nonlinear relationship with the outcome using
+restricted cubic splines. Mean and first biomarker were transformed by taking the base 10 logarithm,
+so that extremely high values did not cause problems with model convergence.
 
 \begin{itemize}
 \item Age at enrollment
@@ -3055,86 +3138,127 @@ mediation effects from delirium.
 \clearpage
 \subsection{CRP}
 \subsubsection{ADL}
-<<printcrpadl, results='asis', fig.cap = 'CRP vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'adl',
-                           marker = 'crp', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'adl',
-                           marker = 'crp', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printcrpadltables, results='asis'>>=
+latex.results(crp.adl.results, 'CRP', 'ADL Scores, Models Without Delirium')
+latex.results(crp.del.adl.results, 'CRP', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printcrpadl, results='asis', fig.cap = 'CRP vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'adl',
+%'                            marker = 'crp', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'adl',
+%'                            marker = 'crp', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printcrpfaq, results='asis', fig.cap = 'CRP vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'faq',
-                           marker = 'crp', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'faq',
-                           marker = 'crp', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
+<<printcrpfaqtables, results='asis'>>=
+latex.results(crp.faq.results, 'CRP', 'FAQ Scores, Models Without Delirium')
+latex.results(crp.del.faq.results, 'CRP', 'FAQ Scores, Models With Delirium')
 
 @
+
+%' <<printcrpfaq, results='asis', fig.cap = 'CRP vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'faq',
+%'                            marker = 'crp', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'faq',
+%'                            marker = 'crp', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{IFN-$\gamma$}
 \subsubsection{ADL}
-<<printifngammaadl, results='asis', fig.cap = 'IFN-gamma vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'adl',
-                           marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
-                           test = 'adl', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printifngammaadltables, results='asis'>>=
+latex.results(ifngamma.adl.results, 'IFN-gamma', 'ADL Scores, Models Without Delirium')
+latex.results(ifngamma.del.adl.results, 'IFN-gamma', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printifngammaadl, results='asis', fig.cap = 'IFN-gamma vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'adl',
+%'                            marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
+%'                            test = 'adl', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printifngammafaq, results='asis', fig.cap = 'IFN-gamma vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'faq',
-                           marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
-                           test = 'faq', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printifngammafaqtables, results='asis'>>=
+latex.results(ifngamma.faq.results, 'IFN-gamma', 'FAQ Scores, Models Without Delirium')
+latex.results(ifngamma.del.faq.results, 'IFN-gamma', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printifngammafaq, results='asis', fig.cap = 'IFN-gamma vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'faq',
+%'                            marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
+%'                            test = 'faq', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{IL-10}
 \subsubsection{ADL}
-<<printil10adl, results='asis', fig.cap = 'IL-10 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'adl',
-                           marker = 'il10', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'adl',
-                           marker = 'il10', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil10adltables, results='asis'>>=
+latex.results(il10.adl.results, 'IL-10', 'ADL Scores, Models Without Delirium')
+latex.results(il10.del.adl.results, 'IL-10', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printil10adl, results='asis', fig.cap = 'IL-10 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'adl',
+%'                            marker = 'il10', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'adl',
+%'                            marker = 'il10', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printil10faq, results='asis', fig.cap = 'IL-10 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'faq',
-                           marker = 'il10', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'faq',
-                           marker = 'il10', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil10faqtables, results='asis'>>=
+latex.results(il10.faq.results, 'IL-10', 'FAQ Scores, Models Without Delirium')
+latex.results(il10.del.faq.results, 'IL-10', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printil10faq, results='asis', fig.cap = 'IL-10 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'faq',
+%'                            marker = 'il10', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'faq',
+%'                            marker = 'il10', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{IL-12}
 \subsubsection{ADL}
-<<printil12adl, results='asis', fig.cap = 'IL-12 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 'adl',
-                           marker = 'il12', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il12.del.mods, plist = il12.del.func.pvals, test = 'adl',
-                           marker = 'il12', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil12adltables, results='asis'>>=
+latex.results(il12.adl.results, 'IL-12', 'ADL Scores, Models Without Delirium')
+latex.results(il12.del.adl.results, 'IL-12', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printil12adl, results='asis', fig.cap = 'IL-12 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 'adl',
+%'                            marker = 'il12', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il12.del.mods, plist = il12.del.func.pvals, test = 'adl',
+%'                            marker = 'il12', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
+<<printil12faqtables, results='asis'>>=
+latex.results(il12.faq.results, 'IL-12', 'FAQ Scores, Models Without Delirium')
+latex.results(il12.del.faq.results, 'IL-12', 'FAQ Scores, Models With Delirium')
+@
+
 <<printil12faq, results='asis', fig.cap = 'IL-12 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
 multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 'faq',
                            marker = 'il12', xlab.addon = 'Models Without Delirium'),
@@ -3147,163 +3271,233 @@ multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 
 \clearpage
 \subsection{IL-1$\beta$}
 \subsubsection{ADL}
-<<printil1badl, results='asis', fig.cap = 'IL1b vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'adl',
-                           marker = 'il1b', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'adl',
-                           marker = 'il1b', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil1badltables, results='asis'>>=
+latex.results(il1b.adl.results, 'IL-1b', 'ADL Scores, Models Without Delirium')
+latex.results(il1b.del.adl.results, 'IL-1b', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printil1badl, results='asis', fig.cap = 'IL1b vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'adl',
+%'                            marker = 'il1b', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'adl',
+%'                            marker = 'il1b', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printil1bfaq, results='asis', fig.cap = 'IL1b vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'faq',
-                           marker = 'il1b', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'faq',
-                           marker = 'il1b', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil1bfaqtables, results='asis'>>=
+latex.results(il1b.faq.results, 'IL-1b', 'FAQ Scores, Models Without Delirium')
+latex.results(il1b.del.faq.results, 'IL-1b', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printil1bfaq, results='asis', fig.cap = 'IL1b vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'faq',
+%'                            marker = 'il1b', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'faq',
+%'                            marker = 'il1b', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{IL-6}
 \subsubsection{ADL}
-<<printil6adl, results='asis', fig.cap = 'IL-6 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'adl',
-                           marker = 'il6', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'adl',
-                           marker = 'il6', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil6adltables, results='asis'>>=
+latex.results(il6.adl.results, 'IL-6', 'ADL Scores, Models Without Delirium')
+latex.results(il6.del.adl.results, 'I-6', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printil6adl, results='asis', fig.cap = 'IL-6 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'adl',
+%'                            marker = 'il6', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'adl',
+%'                            marker = 'il6', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printil6faq, results='asis', fig.cap = 'IL-6 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'faq',
-                           marker = 'il6', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'faq',
-                           marker = 'il6', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil6faqtables, results='asis'>>=
+latex.results(il6.faq.results, 'IL-6', 'FAQ Scores, Models Without Delirium')
+latex.results(il6.del.faq.results, 'IL-6', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printil6faq, results='asis', fig.cap = 'IL-6 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'faq',
+%'                            marker = 'il6', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'faq',
+%'                            marker = 'il6', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{IL-8}
 \subsubsection{ADL}
-<<printil8adl, results='asis', fig.cap = 'IL-8 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'adl',
-                           marker = 'il8', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'adl',
-                           marker = 'il8', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil8adltables, results='asis'>>=
+latex.results(il8.adl.results, 'IL-8', 'ADL Scores, Models Without Delirium')
+latex.results(il8.del.adl.results, 'IL-8', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printil8adl, results='asis', fig.cap = 'IL-8 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'adl',
+%'                            marker = 'il8', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'adl',
+%'                            marker = 'il8', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printil8faq, results='asis', fig.cap = 'IL-8 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'faq',
-                           marker = 'il8', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'faq',
-                           marker = 'il8', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printil8faqtables, results='asis'>>=
+latex.results(il8.adl.results, 'IL-8', 'FAQ Scores, Models Without Delirium')
+latex.results(il8.del.adl.results, 'IL-8', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printil8faq, results='asis', fig.cap = 'IL-8 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'faq',
+%'                            marker = 'il8', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'faq',
+%'                            marker = 'il8', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{MMP9}
 \subsubsection{ADL}
-<<printmmp9adl, results='asis', fig.cap = 'MMP9 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'adl',
-                           marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'adl',
-                           marker = 'mmp9', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printmmp9adltables, results='asis'>>=
+latex.results(mmp9.adl.results, 'MMP9', 'ADL Scores, Models Without Delirium')
+latex.results(mmp9.del.adl.results, 'MMP9', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printmmp9adl, results='asis', fig.cap = 'MMP9 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'adl',
+%'                            marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'adl',
+%'                            marker = 'mmp9', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printmmp9faq, results='asis', fig.cap = 'MMP9 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'faq',
-                           marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'faq',
-                           marker = 'mmp9', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printmmp9faqtables, results='asis'>>=
+latex.results(mmp9.faq.results, 'MMP9', 'FAQ Scores, Models Without Delirium')
+latex.results(mmp9.del.faq.results, 'MMP9', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printmmp9faq, results='asis', fig.cap = 'MMP9 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'faq',
+%'                            marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'faq',
+%'                            marker = 'mmp9', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{Protein C}
 \subsubsection{ADL}
-<<printproteincadl, results='asis', fig.cap = 'Protein C vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'adl',
-                           marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'adl',
-                           marker = 'proteinc', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printproteincadltables, results='asis'>>=
+latex.results(proteinc.adl.results, 'Protein C', 'ADL Scores, Models Without Delirium')
+latex.results(proteinc.del.adl.results, 'Protein C', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printproteincadl, results='asis', fig.cap = 'Protein C vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'adl',
+%'                            marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'adl',
+%'                            marker = 'proteinc', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printproteincfaq, results='asis', fig.cap = 'Protein C vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'faq',
-                           marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'faq',
-                           marker = 'proteinc', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printproteincfaqtables, results='asis'>>=
+latex.results(proteinc.adl.results, 'Protein C', 'FAQ Scores, Models Without Delirium')
+latex.results(proteinc.del.adl.results, 'Protein C', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printproteincfaq, results='asis', fig.cap = 'Protein C vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'faq',
+%'                            marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'faq',
+%'                            marker = 'proteinc', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{TNF$\alpha$}
 \subsubsection{ADL}
-<<printtnfaadl, results='asis', fig.cap = 'TNF-alpha vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'adl',
-                           marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'adl',
-                           marker = 'tnfa', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printtnfaadltables, results='asis'>>=
+latex.results(tnfa.adl.results, 'TNF-alpha', 'ADL Scores, Models Without Delirium')
+latex.results(tnfa.del.adl.results, 'TNF-alpha', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printtnfaadl, results='asis', fig.cap = 'TNF-alpha vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'adl',
+%'                            marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'adl',
+%'                            marker = 'tnfa', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printtnfafaq, results='asis', fig.cap = 'TNF-alpha vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'faq',
-                           marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'faq',
-                           marker = 'tnfa', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printtnfafaqtables, results='asis'>>=
+latex.results(tnfa.faq.results, 'TNF-alpha', 'FAQ Scores, Models Without Delirium')
+latex.results(tnfa.del.faq.results, 'TNF-alpha', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printtnfafaq, results='asis', fig.cap = 'TNF-alpha vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'faq',
+%'                            marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'faq',
+%'                            marker = 'tnfa', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsection{TNFR1}
 \subsubsection{ADL}
-<<printtnfr1adl, results='asis', fig.cap = 'TNFR1 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'adl',
-                           marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'adl',
-                           marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printtnfr1adltables, results='asis'>>=
+latex.results(tnfr1.adl.results, 'TNFR1', 'ADL Scores, Models Without Delirium')
+latex.results(tnfr1.del.adl.results, 'TNFR1', 'ADL Scores, Models With Delirium')
 @
+
+%' <<printtnfr1adl, results='asis', fig.cap = 'TNFR1 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'adl',
+%'                            marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'adl',
+%'                            marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \clearpage
 \subsubsection{FAQ}
-<<printtnfr1faq, results='asis', fig.cap = 'TNFR1 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'faq',
-                           marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
-          funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'faq',
-                           marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
-          layout = matrix(1:2, ncol = 1))
-
+<<printtnfr1faqtables, results='asis'>>=
+latex.results(tnfr1.faq.results, 'TNFR1', 'FAQ Scores, Models Without Delirium')
+latex.results(tnfr1.del.faq.results, 'TNFR1', 'FAQ Scores, Models With Delirium')
 @
+
+%' <<printtnfr1faq, results='asis', fig.cap = 'TNFR1 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+%' multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'faq',
+%'                            marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
+%'           funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'faq',
+%'                            marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
+%'           layout = matrix(1:2, ncol = 1))
+%'
+%' @
 
 \end{landscape}
 
