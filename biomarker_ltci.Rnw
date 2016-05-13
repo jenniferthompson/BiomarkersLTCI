@@ -2174,6 +2174,285 @@ calc.funcresults <- function(biomod, pred.vals){
   return(as.data.frame(cbind(biovals, lp, lp.se, count.pe, count.lcl, count.ucl)))
 }
 
+## -- Function to create design matrices for count, zero portions given a zeroinfl object, ---------
+## --  X & interacting variables -------------------------------------------------------------------
+create.designmat.zinf <- function(modobj,                ## zeroinfl model object, or mice object
+                                                         ##  with zeroinfl fits
+                                  xvar,                  ## string; variable for x axis
+                                  intvar = NULL,         ## string; variable to interact
+                                  intvals = NULL,        ## vector; values to set int. variable to
+                                  dataset = model.data){ ## data frame to get unique X values from
+
+  ## miceobj must be of class zeroinfl
+  if(!('zeroinfl' %in% class(modobj)) == 0 &
+     !('mira' %in% class(modobj) & 'zeroinfl' %in% class(modobj$analyses[[1]]))){
+    stop('modobj must be of class zeroinfl from pscl library, or a mice object with zeroinfl fits')
+  }
+
+  if(!is.null(intvar) & length(grep(':', names(coef(modobj)))) == 0){
+    stop('Interacting variable is specified, but model does not include interaction terms')
+  }
+
+  if(!is.null(intvar) & is.null(intvals)){
+    stop('Interacting variable is specified, but no interacting values are specified')
+  }
+
+  ## Indicator for whether model is a mice object vs zeroinfl
+  is.mice <- 'mira' %in% class(modobj)
+
+  ## Get coefficient names for count and zero portions
+  if(is.mice){
+    coefnames <- names(coef(modobj$analyses[[1]]))
+  } else{
+    coefnames <- names(coef(modobj))
+  }
+  coefs.c <- coefnames[grep('^count', coefnames)]
+  coefs.z <- coefnames[grep('^zero', coefnames)]
+
+  ## Strip out "rcs(...)" and "count_/zero_"
+  coefs.c <- gsub("^[a-z]+_", "", gsub("rcs\\([a-z.,0-9 ]+\\)", "", coefs.c))
+  coefs.z <- gsub("^[a-z]+_", "", gsub("rcs\\([a-z.,0-9 ]+\\)", "", coefs.z))
+
+  ## Get unique values of variable on X axis
+  xvals <- sort(unique(dataset[,xvar]))
+  xknots <- rcspline.eval(xvals, nk = 3, knots.only = TRUE)
+  xvals <- xvals[xvals >= xknots[1] & xvals <= xknots[3]]
+  if(length(grep(paste0(xvar, "'"), coefnames)) > 0){
+    xvals.mat <- rcspline.eval(xvals, knots = xknots, inclx = TRUE)
+    colnames(xvals.mat) <- unlist(lapply(1:ncol(xvals.mat), FUN = function(c){
+      paste0('x', paste(rep("'", c - 1), collapse = '')) }))
+  } else{
+    xvals.mat <- matrix(xvals, ncol = 1)
+  }
+
+  ## Set values for all non-interaction columns
+  coefs.noint.c <- coefs.c[grep(':', coefs.c, invert = TRUE)]
+  coefs.int.c <- coefs.c[grep(':', coefs.c)]
+  coefs.noint.z <- coefs.z[grep(':', coefs.z, invert = TRUE)]
+  coefs.int.z <- coefs.z[grep(':', coefs.z)]
+
+  ## Function to fill in non-interaction columns
+  fill.predvals.noint <- function(name){
+    if(name == '(Intercept)'){
+      rep(1, length(xvals))
+    } else if(name == xvar){
+      xvals
+    } else if(name == paste0(xvar, "'")){
+      xvals.mat[,"x'"]
+#     } else if(!is.null(intvar) & name %in% c(intvar, paste0(intvar, "'"))){
+#       rep(NA, length(xvals))
+#     } else if(name %in% catvars){
+#       rep(0, length(xvals))
+    } else if(length(grep("'", name)) == 0){
+      median(dataset[,name], na.rm = TRUE)
+#     } else{
+#       get.med.spline(gsub('.$', '', name))
+    }
+  }
+
+  predmat.noint.c <- do.call(cbind, lapply(coefs.noint.c, FUN = fill.predvals.noint))
+  colnames(predmat.noint.c) <- coefs.noint.c
+
+  predmat.noint.z <- do.call(cbind, lapply(coefs.noint.z, FUN = fill.predvals.noint))
+  colnames(predmat.noint.z) <- coefs.noint.z
+
+#   ## If there is an interacting variable, repeat predmat.noint x number of unique values, then
+#   ##  fill in NA columns with unique values
+#   if(!is.null(intvar)){
+#     predmat.noint.c <-
+#       do.call(rbind, replicate(length(intvals), predmat.noint.c, simplify = FALSE))
+#     if(intvar %in% colnames(predmat.noint.c)){
+#       predmat.noint.c[,intvar] <-
+#         unlist(lapply(intvals, FUN = function(x){ rep(x, length(xvals)) }))
+#     }
+#
+#     predmat.noint.z <-
+#       do.call(rbind, replicate(length(intvals), predmat.noint.z, simplify = FALSE))
+#     if(intvar %in% colnames(predmat.noint.z)){
+#       predmat.noint.z[,intvar] <-
+#         unlist(lapply(intvals, FUN = function(x){ rep(x, length(xvals)) }))
+#     }
+#
+#     ## If interacting variable is nonlinear, determine knots for spline term
+#     if(length(grep(paste0(intvar, "'"), coefnames)) > 0){
+#       intknots <- rcspline.eval(dataset[,intvar], nk = 3, knots.only = TRUE)
+#       intspline <- unlist(lapply(intvals,
+#                                  FUN = calc.spline,
+#                                  k1 = intknots[1], k2 = intknots[2], k3 = intknots[3]))
+#       if(length(grep(paste0(intvar, "'"), coefs.c)) > 0){
+#         predmat.noint.c[,paste0(intvar, "'")] <-
+#           unlist(lapply(intspline, FUN = function(x){ rep(x, length(xvals)) }))
+#       }
+#
+#       if(length(grep(paste0(intvar, "'"), coefs.z)) > 0){
+#         predmat.noint.z[,paste0(intvar, "'")] <-
+#           unlist(lapply(intspline, FUN = function(x){ rep(x, length(xvals)) }))
+#       }
+#     }
+#   }
+
+  if(length(coefs.int.c) > 0){
+    predmat.int.c <- do.call(cbind,
+                             lapply(coefs.int.c, FUN = function(name){
+                               tmp <- strsplit(name, ':')[[1]]
+                               predmat.noint.c[,tmp[1]] * predmat.noint.c[,tmp[2]]
+                             }))
+    colnames(predmat.int.c) <- coefs.int.c
+    predmat.c <- cbind(predmat.noint.c, predmat.int.c)[,coefs.c]
+  } else{
+    predmat.c <- predmat.noint.c[,coefs.c]
+  }
+
+  if(length(coefs.int.z) > 0){
+    predmat.int.z <- do.call(cbind,
+                             lapply(coefs.int.z, FUN = function(name){
+                               tmp <- strsplit(name, ':')[[1]]
+                               predmat.noint.z[,tmp[1]] * predmat.noint.z[,tmp[2]]
+                             }))
+    colnames(predmat.int.z) <- coefs.int.z
+    predmat.c <- cbind(predmat.noint.z, predmat.int.z)[,coefs.z]
+  } else{
+    predmat.z <- predmat.noint.z[,coefs.z]
+  }
+
+  return(list('predmat.c' = predmat.c, 'predmat.z' = predmat.z))
+
+}
+
+## -- Function to get predicted response values from a zero-inflated NB model ----------------------
+zinf.response <- function(modobj,       ## Original model object
+                          design.zinf){ ## List of design matrices
+  ## Get coefficient estimates from modobj, split into count and zero portions
+  if('mira' %in% class(modobj)){
+    mod.coefs <- pool(modobj)$qbar
+  } else{
+    mod.coefs <- coef(modobj)
+  }
+
+  coefs.c <- mod.coefs[grep('^count_', names(mod.coefs))]
+  coefs.z <- mod.coefs[grep('^zero_', names(mod.coefs))]
+
+  ## Get linear predictors for count, zero portions
+  lp.c <- apply(design.zinf$predmat.c,
+                MARGIN = 1,
+                FUN = function(x){ sum(x * coefs.c) })
+  lp.z <- apply(design.zinf$predmat.z,
+                MARGIN = 1,
+                FUN = function(x){ sum(x * coefs.z) })
+
+  ## Get point estimates for each unique value of marker
+  ## exp(LPc) * (1 - (exp(LPz) / (1 + exp(LPz))))
+  pred.response <- exp(lp.c) * (1 - (exp(lp.z) / (1 + exp(lp.z))))
+
+  pred.response
+}
+
+## -- Function to get data sets of predicted values for plotting zero-inflated NB models -----------
+zinf.plotdata <- function(modobj,               ## Original model object to base bootstraps on
+                          xvar){                ## Main exposure variable
+  ## Does model include age/IL-6 interactions?
+  intmod <- (length(grep(':', modobj$call)) > 0)
+
+  ## Step 1: Create design matrices
+#   if(intmod){
+#     intvars <- c('age.div10', 'il6.log10')
+#     design.age <-
+#       create.designmat.zinf(modobj, xvar, intvar = 'age.div10', intvals = intvals.age / 10)
+#     design.il6 <-
+#       create.designmat.zinf(modobj, xvar, intvar = 'il6.log10', intvals = intvals.il6)
+#     design.all <- list(design.age, design.il6)
+#   } else{
+    design.all <- list(create.designmat.zinf(modobj, xvar))
+  # }
+
+  ## Step 2: Get point estimates from main model for each design matrix
+  pointests <- lapply(design.all, FUN = function(dmat){
+    zinf.response(modobj, dmat)
+  })
+
+  ## Step 3: bind xvar, predicted value
+  pred.final <- lapply(1:length(design.all), FUN = function(dmat){
+    tmp <- as.data.frame(cbind(design.all[[dmat]]$predmat.c[,xvar],
+                               pointests[[dmat]]))
+    names(tmp) <- c(xvar, 'pe')
+    tmp
+  })
+
+  return(pred.final)
+
+#   ## Step 3: Get predicted values for each bootstrapped data set, using model call in modobj
+#   formula.final <- as.character(modobj$call)[2]
+#
+#   mod.list <- vector('list', n.boot)
+#   n.succ <- n.fail <- 0
+#
+#   iter <- 1
+#   while(n.succ < n.boot){
+#     cur.model <- do.call(try.zeroinfl,
+#                          list(formula = as.formula(formula.final),
+#                               dist = 'negbin',
+#                               data = bootdata[[iter]]))
+#
+#     ## Did model have an error/warning? Or does it have more/fewer coefs than original?
+#     curmod.failed <- inherits(cur.model, 'try-error')
+#
+#     if(curmod.failed){
+#       n.fail <- n.fail + 1
+#       ## With first failure, begin a text file to store error messages; with following failues,
+#       ##  add subsequent errors to it
+#       if(n.fail == 1){ append.txt <- TRUE } else{ append.txt <- FALSE }
+#
+#       sink(file = paste('zeroinfl_errors_', xvar, '.txt', sep = ''), append = append.txt)
+#       cat('Errors and warnings for ', xvar, '\n\nFailure ', n.fail, ': ', cur.model[1], '\n',
+#           sep = '')
+#       sink()
+#       ## Otherwise, increment # successes, save model fit, coefficients, SEs, LR test if needed
+#     } else{
+#       n.succ <- n.succ + 1
+#       mod.list[[n.succ]] <- cur.model
+#     }
+#
+#     print(paste("Finished bootstrap iteration", iter, "for", xvar))
+#     iter <- iter + 1
+#   }
+#
+#   pred.all <- lapply(design.all, FUN = function(dmat){
+#     do.call(cbind,
+#             lapply(1:length(mod.list), FUN = function(mod){
+#               cat('Starting model predictions for model', mod, 'of', length(mod.list), '\n')
+#               zinf.response(mod.list[[mod]], dmat)
+#             }))
+#   })
+#
+#   ## Step 4: Get CIs for each row of the design matrix
+#   pred.cis <- lapply(pred.all, FUN = function(pmat){
+#     t(apply(pmat, MARGIN = 1, FUN = get.ci))
+#   })
+#
+#   ## Step 5: combine with original xvar, interacting value and point estimate
+#   if(intmod){
+#     pred.final <- lapply(1:length(design.all), FUN = function(dmat){
+#       tmp <- as.data.frame(cbind(design.all[[dmat]]$predmat.c[,c(xvar, intvars[dmat])],
+#                                  pointests[[dmat]],
+#                                  pred.cis[[dmat]]))
+#       names(tmp) <- c(xvar, intvars[dmat], 'pe', 'lcl', 'ucl')
+#       tmp
+#     })
+#   } else{
+#     pred.final <- lapply(1:length(design.all), FUN = function(dmat){
+#       tmp <- as.data.frame(cbind(design.all[[dmat]]$predmat.c[,xvar],
+#                                  pointests[[dmat]],
+#                                  pred.cis[[dmat]]))
+#       names(tmp) <- c(xvar, 'pe', 'lcl', 'ucl')
+#       tmp
+#     })
+#   }
+#
+#   return(list('pred.data' = pred.final, 'n.fail' = n.fail))
+
+}
+
+
 @
 
 <<getresults>>=
@@ -2591,57 +2870,149 @@ cogresults.plot <- function(modlist, ## List of model objects (eg, crp.mods)
   return(marker.plot)
 }
 
+# ## Functional outcomes (negative binomial models)
+# funcresults.plot <- function(modlist,
+#                              plist,
+#                              test = c('adl', 'faq'),
+#                              marker,
+#                              xlab.addon = NULL){
+#
+#   ## Create data frame of p-value strings to add to each plot
+#   p.data <- data.frame(modtype = names(plist),
+#                        pval = as.numeric(plist))
+#   p.data <- p.data[p.data$modtype %in% grep(test, p.data$modtype, value = TRUE),] %>%
+#     ## Separate model name variable into pieces and use to create factors for plotting
+#     separate(modtype, into = c('p', 'measure', 'test', 'weight', 'time')) %>%
+#     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
+#                                ifelse(measure == 'first', 2, 3)),
+#                                levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
+#            timestr = factor(ifelse(time == 3, 1, 2),
+#                             levels = 1:2, labels = c('3 Months', '12 Months'))) %>%
+#     dplyr::select(-p, -measure, -test) %>%
+#     spread(key = weight, value = pval) %>%
+#     mutate(pval.string = paste0('Unweighted p: ', formatp(nowt),
+#                                 '\nWeighted p: ', formatp(wt)))
+#
+#   ## For all models in modlist which involve test of interest, get predicted values;
+#   ##  bind all predicted values in single data set, adding model name (eg,
+#   ##  mean.rbans.nowt.3) as variable
+#
+#   ## Is delirium included in model?
+#   if(length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0){
+#     use.pred.vals <- pred.del.vec
+#   } else{
+#     use.pred.vals <- pred.vec
+#   }
+#
+#   pred.data <- bind_rows(lapply(grep(test, names(modlist)), FUN = function(x){
+#     tmp <- calc.funcresults(modlist[[x]], use.pred.vals)
+#     tmp$modtype <- names(modlist)[x]
+#     tmp
+#   })) %>%
+#     ## Separate model name variable into pieces and use to create factors for plotting
+#     separate(modtype, into = c('measure', 'test', 'weight', 'time')) %>%
+#     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
+#                                ifelse(measure == 'first', 2, 3)),
+#                                levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
+#            timestr = factor(ifelse(time == 3, 1, 2),
+#                             levels = 1:2, labels = c('3 Months', '12 Months')))
+#
+#   ## Get X and Y values from pred.data for adding p-value text, add to p.data
+#   xvals <- group_by(pred.data, measurestr) %>% summarise(x.val = max(biovals))
+#   p.data <- p.data %>% left_join(xvals, by = 'measurestr') %>%
+#     mutate(y.val = max(pred.data$count.ucl, na.rm = TRUE))
+#
+#   ## Create X label string
+#   if(is.null(xlab.addon)){
+#     use.xlab <- paste('Measure of', toupper(marker))
+#   } else{
+#     use.xlab <- paste0('Measure of ', toupper(marker), ', ', xlab.addon)
+#   }
+#
+#
+#   ## Plot, with biomarker measures as columns and time points as rows
+#   marker.plot <- ggplot(aes(x = biovals), data = pred.data) +
+#     facet_grid(timestr ~ measurestr, scales = 'free_x') +
+#     geom_ribbon(aes(ymin = count.lcl, ymax = count.ucl, fill = weight), alpha = 0.4) +
+#     geom_line(aes(y = count.pe, colour = weight)) +
+#     geom_text(aes(x = x.val, y = y.val, label = pval.string),
+#               data = p.data, fontface = 'bold', hjust = 1, vjust = 1, size = 2) +
+#     scale_colour_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
+#     scale_fill_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
+#     xlab(use.xlab) +
+#     ylab(test.ylabs[match(test, test.ylabs$testvar), 'testylab']) +
+#     theme_bw() +
+#     theme(legend.position = 'bottom',
+#           legend.key.size = unit(0.25, "cm"),
+#           legend.text = element_text(size = 8),
+#           axis.ticks = element_line(colour = 'grey50'),
+#           axis.text = element_text(size = 8),
+#           axis.title.x = element_text(vjust = 0),
+#           strip.background = element_blank(),
+#           panel.margin = unit(0.5, 'lines'))
+#
+#   return(marker.plot)
+#
+# }
+
 ## Functional outcomes (negative binomial models)
 funcresults.plot <- function(modlist,
-                             plist,
+                             plist = NULL,
                              test = c('adl', 'faq'),
                              marker,
                              xlab.addon = NULL){
 
-  ## Create data frame of p-value strings to add to each plot
-  p.data <- data.frame(modtype = names(plist),
-                       pval = as.numeric(plist))
-  p.data <- p.data[p.data$modtype %in% grep(test, p.data$modtype, value = TRUE),] %>%
-    ## Separate model name variable into pieces and use to create factors for plotting
-    separate(modtype, into = c('p', 'measure', 'test', 'weight', 'time')) %>%
-    mutate(measurestr = factor(ifelse(measure == 'mean', 1,
-                               ifelse(measure == 'first', 2, 3)),
-                               levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
-           timestr = factor(ifelse(time == 3, 1, 2),
-                            levels = 1:2, labels = c('3 Months', '12 Months'))) %>%
-    dplyr::select(-p, -measure, -test) %>%
-    spread(key = weight, value = pval) %>%
-    mutate(pval.string = paste0('Unweighted p: ', formatp(nowt),
-                                '\nWeighted p: ', formatp(wt)))
+#   ## Create data frame of p-value strings to add to each plot
+#   p.data <- data.frame(modtype = names(plist),
+#                        pval = as.numeric(plist))
+#   p.data <- p.data[p.data$modtype %in% grep(test, p.data$modtype, value = TRUE),] %>%
+#     ## Separate model name variable into pieces and use to create factors for plotting
+#     separate(modtype, into = c('p', 'measure', 'test', 'weight', 'time')) %>%
+#     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
+#                                       ifelse(measure == 'first', 2, 3)),
+#                                levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
+#            timestr = factor(ifelse(time == 3, 1, 2),
+#                             levels = 1:2, labels = c('3 Months', '12 Months'))) %>%
+#     dplyr::select(-p, -measure, -test) %>%
+#     spread(key = weight, value = pval) %>%
+#     mutate(pval.string = paste0('Unweighted p: ', formatp(nowt),
+#                                 '\nWeighted p: ', formatp(wt)))
 
   ## For all models in modlist which involve test of interest, get predicted values;
   ##  bind all predicted values in single data set, adding model name (eg,
   ##  mean.rbans.nowt.3) as variable
 
   ## Is delirium included in model?
-  if(length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0){
-    use.pred.vals <- pred.del.vec
-  } else{
-    use.pred.vals <- pred.vec
-  }
+  inc.del <- length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0
+
+#   if(length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0){
+#     use.pred.vals <- pred.del.vec
+#   } else{
+#     use.pred.vals <- pred.vec
+#   }
 
   pred.data <- bind_rows(lapply(grep(test, names(modlist)), FUN = function(x){
-    tmp <- calc.funcresults(modlist[[x]], use.pred.vals)
+    use.meas <- strsplit(names(modlist)[x], '\\.')[[1]][1]
+    use.xvar <- paste(marker, use.meas, sep = '.')
+    use.xvar <- ifelse(use.meas %in% c('mean', 'first'), paste0(use.xvar, '.t'), use.xvar)
+
+    tmp <- zinf.plotdata(modlist[[x]], use.xvar)[[1]]
     tmp$modtype <- names(modlist)[x]
+    names(tmp) <- gsub(use.xvar, 'biovals', names(tmp))
     tmp
   })) %>%
     ## Separate model name variable into pieces and use to create factors for plotting
     separate(modtype, into = c('measure', 'test', 'weight', 'time')) %>%
     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
-                               ifelse(measure == 'first', 2, 3)),
+                                      ifelse(measure == 'first', 2, 3)),
                                levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
            timestr = factor(ifelse(time == 3, 1, 2),
                             levels = 1:2, labels = c('3 Months', '12 Months')))
 
-  ## Get X and Y values from pred.data for adding p-value text, add to p.data
-  xvals <- group_by(pred.data, measurestr) %>% summarise(x.val = max(biovals))
-  p.data <- p.data %>% left_join(xvals, by = 'measurestr') %>%
-    mutate(y.val = max(pred.data$count.ucl, na.rm = TRUE))
+#   ## Get X and Y values from pred.data for adding p-value text, add to p.data
+#   xvals <- group_by(pred.data, measurestr) %>% summarise(x.val = max(biovals))
+#   p.data <- p.data %>% left_join(xvals, by = 'measurestr') %>%
+#     mutate(y.val = max(pred.data$count.ucl, na.rm = TRUE))
 
   ## Create X label string
   if(is.null(xlab.addon)){
@@ -2650,18 +3021,19 @@ funcresults.plot <- function(modlist,
     use.xlab <- paste0('Measure of ', toupper(marker), ', ', xlab.addon)
   }
 
+  use.ylab <- ifelse(test == 'adl', 'Adjusted ADL Score', 'Adjusted FAQ Score')
 
   ## Plot, with biomarker measures as columns and time points as rows
   marker.plot <- ggplot(aes(x = biovals), data = pred.data) +
     facet_grid(timestr ~ measurestr, scales = 'free_x') +
-    geom_ribbon(aes(ymin = count.lcl, ymax = count.ucl, fill = weight), alpha = 0.4) +
-    geom_line(aes(y = count.pe, colour = weight)) +
-    geom_text(aes(x = x.val, y = y.val, label = pval.string),
-              data = p.data, fontface = 'bold', hjust = 1, vjust = 1, size = 2) +
+    # geom_ribbon(aes(ymin = count.lcl, ymax = count.ucl, fill = weight), alpha = 0.4) +
+    geom_line(aes(y = pe, colour = weight)) +
+#     geom_text(aes(x = x.val, y = y.val, label = pval.string),
+#               data = p.data, fontface = 'bold', hjust = 1, vjust = 1, size = 2) +
     scale_colour_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
     scale_fill_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
     xlab(use.xlab) +
-    ylab(test.ylabs[match(test, test.ylabs$testvar), 'testylab']) +
+    ylab(use.ylab) +
     theme_bw() +
     theme(legend.position = 'bottom',
           legend.key.size = unit(0.25, "cm"),
@@ -3143,14 +3515,14 @@ latex.results(crp.adl.results, 'CRP', 'ADL Scores, Models Without Delirium')
 latex.results(crp.del.adl.results, 'CRP', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printcrpadl, results='asis', fig.cap = 'CRP vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'adl',
-%'                            marker = 'crp', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'adl',
-%'                            marker = 'crp', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printcrpadl, results='asis', fig.cap = 'CRP vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'adl',
+                           marker = 'crp', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'adl',
+                           marker = 'crp', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3160,14 +3532,14 @@ latex.results(crp.del.faq.results, 'CRP', 'FAQ Scores, Models With Delirium')
 
 @
 
-%' <<printcrpfaq, results='asis', fig.cap = 'CRP vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'faq',
-%'                            marker = 'crp', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'faq',
-%'                            marker = 'crp', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printcrpfaq, results='asis', fig.cap = 'CRP vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = crp.mods, plist = crp.func.pvals, test = 'faq',
+                           marker = 'crp', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = crp.del.mods, plist = crp.del.func.pvals, test = 'faq',
+                           marker = 'crp', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{IFN-$\gamma$}
@@ -3177,14 +3549,14 @@ latex.results(ifngamma.adl.results, 'IFN-gamma', 'ADL Scores, Models Without Del
 latex.results(ifngamma.del.adl.results, 'IFN-gamma', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printifngammaadl, results='asis', fig.cap = 'IFN-gamma vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'adl',
-%'                            marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
-%'                            test = 'adl', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printifngammaadl, results='asis', fig.cap = 'IFN-gamma vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'adl',
+                           marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
+                           test = 'adl', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3193,14 +3565,14 @@ latex.results(ifngamma.faq.results, 'IFN-gamma', 'FAQ Scores, Models Without Del
 latex.results(ifngamma.del.faq.results, 'IFN-gamma', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printifngammafaq, results='asis', fig.cap = 'IFN-gamma vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'faq',
-%'                            marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
-%'                            test = 'faq', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printifngammafaq, results='asis', fig.cap = 'IFN-gamma vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = ifngamma.mods, plist = ifngamma.func.pvals, test = 'faq',
+                           marker = 'ifngamma', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = ifngamma.del.mods, plist = ifngamma.del.func.pvals,
+                           test = 'faq', marker = 'ifngamma', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{IL-10}
@@ -3210,14 +3582,14 @@ latex.results(il10.adl.results, 'IL-10', 'ADL Scores, Models Without Delirium')
 latex.results(il10.del.adl.results, 'IL-10', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printil10adl, results='asis', fig.cap = 'IL-10 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'adl',
-%'                            marker = 'il10', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'adl',
-%'                            marker = 'il10', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil10adl, results='asis', fig.cap = 'IL-10 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'adl',
+                           marker = 'il10', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'adl',
+                           marker = 'il10', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3226,14 +3598,14 @@ latex.results(il10.faq.results, 'IL-10', 'FAQ Scores, Models Without Delirium')
 latex.results(il10.del.faq.results, 'IL-10', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printil10faq, results='asis', fig.cap = 'IL-10 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'faq',
-%'                            marker = 'il10', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'faq',
-%'                            marker = 'il10', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil10faq, results='asis', fig.cap = 'IL-10 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il10.mods, plist = il10.func.pvals, test = 'faq',
+                           marker = 'il10', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il10.del.mods, plist = il10.del.func.pvals, test = 'faq',
+                           marker = 'il10', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{IL-12}
@@ -3243,14 +3615,14 @@ latex.results(il12.adl.results, 'IL-12', 'ADL Scores, Models Without Delirium')
 latex.results(il12.del.adl.results, 'IL-12', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printil12adl, results='asis', fig.cap = 'IL-12 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 'adl',
-%'                            marker = 'il12', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il12.del.mods, plist = il12.del.func.pvals, test = 'adl',
-%'                            marker = 'il12', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil12adl, results='asis', fig.cap = 'IL-12 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il12.mods, plist = il12.func.pvals, test = 'adl',
+                           marker = 'il12', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il12.del.mods, plist = il12.del.func.pvals, test = 'adl',
+                           marker = 'il12', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3276,14 +3648,14 @@ latex.results(il1b.adl.results, 'IL-1b', 'ADL Scores, Models Without Delirium')
 latex.results(il1b.del.adl.results, 'IL-1b', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printil1badl, results='asis', fig.cap = 'IL1b vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'adl',
-%'                            marker = 'il1b', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'adl',
-%'                            marker = 'il1b', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil1badl, results='asis', fig.cap = 'IL1b vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'adl',
+                           marker = 'il1b', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'adl',
+                           marker = 'il1b', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3292,14 +3664,14 @@ latex.results(il1b.faq.results, 'IL-1b', 'FAQ Scores, Models Without Delirium')
 latex.results(il1b.del.faq.results, 'IL-1b', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printil1bfaq, results='asis', fig.cap = 'IL1b vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'faq',
-%'                            marker = 'il1b', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'faq',
-%'                            marker = 'il1b', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil1bfaq, results='asis', fig.cap = 'IL1b vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il1b.mods, plist = il1b.func.pvals, test = 'faq',
+                           marker = 'il1b', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il1b.del.mods, plist = il1b.del.func.pvals, test = 'faq',
+                           marker = 'il1b', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{IL-6}
@@ -3309,14 +3681,14 @@ latex.results(il6.adl.results, 'IL-6', 'ADL Scores, Models Without Delirium')
 latex.results(il6.del.adl.results, 'I-6', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printil6adl, results='asis', fig.cap = 'IL-6 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'adl',
-%'                            marker = 'il6', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'adl',
-%'                            marker = 'il6', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil6adl, results='asis', fig.cap = 'IL-6 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'adl',
+                           marker = 'il6', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'adl',
+                           marker = 'il6', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3325,14 +3697,14 @@ latex.results(il6.faq.results, 'IL-6', 'FAQ Scores, Models Without Delirium')
 latex.results(il6.del.faq.results, 'IL-6', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printil6faq, results='asis', fig.cap = 'IL-6 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'faq',
-%'                            marker = 'il6', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'faq',
-%'                            marker = 'il6', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil6faq, results='asis', fig.cap = 'IL-6 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il6.mods, plist = il6.func.pvals, test = 'faq',
+                           marker = 'il6', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il6.del.mods, plist = il6.del.func.pvals, test = 'faq',
+                           marker = 'il6', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{IL-8}
@@ -3342,14 +3714,14 @@ latex.results(il8.adl.results, 'IL-8', 'ADL Scores, Models Without Delirium')
 latex.results(il8.del.adl.results, 'IL-8', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printil8adl, results='asis', fig.cap = 'IL-8 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'adl',
-%'                            marker = 'il8', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'adl',
-%'                            marker = 'il8', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil8adl, results='asis', fig.cap = 'IL-8 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'adl',
+                           marker = 'il8', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'adl',
+                           marker = 'il8', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3358,14 +3730,14 @@ latex.results(il8.adl.results, 'IL-8', 'FAQ Scores, Models Without Delirium')
 latex.results(il8.del.adl.results, 'IL-8', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printil8faq, results='asis', fig.cap = 'IL-8 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'faq',
-%'                            marker = 'il8', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'faq',
-%'                            marker = 'il8', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printil8faq, results='asis', fig.cap = 'IL-8 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = il8.mods, plist = il8.func.pvals, test = 'faq',
+                           marker = 'il8', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = il8.del.mods, plist = il8.del.func.pvals, test = 'faq',
+                           marker = 'il8', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{MMP9}
@@ -3375,14 +3747,14 @@ latex.results(mmp9.adl.results, 'MMP9', 'ADL Scores, Models Without Delirium')
 latex.results(mmp9.del.adl.results, 'MMP9', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printmmp9adl, results='asis', fig.cap = 'MMP9 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'adl',
-%'                            marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'adl',
-%'                            marker = 'mmp9', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printmmp9adl, results='asis', fig.cap = 'MMP9 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'adl',
+                           marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'adl',
+                           marker = 'mmp9', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3391,14 +3763,14 @@ latex.results(mmp9.faq.results, 'MMP9', 'FAQ Scores, Models Without Delirium')
 latex.results(mmp9.del.faq.results, 'MMP9', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printmmp9faq, results='asis', fig.cap = 'MMP9 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'faq',
-%'                            marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'faq',
-%'                            marker = 'mmp9', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printmmp9faq, results='asis', fig.cap = 'MMP9 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = mmp9.mods, plist = mmp9.func.pvals, test = 'faq',
+                           marker = 'mmp9', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = mmp9.del.mods, plist = mmp9.del.func.pvals, test = 'faq',
+                           marker = 'mmp9', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{Protein C}
@@ -3408,14 +3780,14 @@ latex.results(proteinc.adl.results, 'Protein C', 'ADL Scores, Models Without Del
 latex.results(proteinc.del.adl.results, 'Protein C', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printproteincadl, results='asis', fig.cap = 'Protein C vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'adl',
-%'                            marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'adl',
-%'                            marker = 'proteinc', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printproteincadl, results='asis', fig.cap = 'Protein C vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'adl',
+                           marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'adl',
+                           marker = 'proteinc', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3424,14 +3796,14 @@ latex.results(proteinc.adl.results, 'Protein C', 'FAQ Scores, Models Without Del
 latex.results(proteinc.del.adl.results, 'Protein C', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printproteincfaq, results='asis', fig.cap = 'Protein C vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'faq',
-%'                            marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'faq',
-%'                            marker = 'proteinc', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printproteincfaq, results='asis', fig.cap = 'Protein C vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = proteinc.mods, plist = proteinc.func.pvals, test = 'faq',
+                           marker = 'proteinc', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = proteinc.del.mods, plist = proteinc.del.func.pvals, test = 'faq',
+                           marker = 'proteinc', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{TNF$\alpha$}
@@ -3441,14 +3813,14 @@ latex.results(tnfa.adl.results, 'TNF-alpha', 'ADL Scores, Models Without Deliriu
 latex.results(tnfa.del.adl.results, 'TNF-alpha', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printtnfaadl, results='asis', fig.cap = 'TNF-alpha vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'adl',
-%'                            marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'adl',
-%'                            marker = 'tnfa', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printtnfaadl, results='asis', fig.cap = 'TNF-alpha vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'adl',
+                           marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'adl',
+                           marker = 'tnfa', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3457,14 +3829,14 @@ latex.results(tnfa.faq.results, 'TNF-alpha', 'FAQ Scores, Models Without Deliriu
 latex.results(tnfa.del.faq.results, 'TNF-alpha', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printtnfafaq, results='asis', fig.cap = 'TNF-alpha vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'faq',
-%'                            marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'faq',
-%'                            marker = 'tnfa', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printtnfafaq, results='asis', fig.cap = 'TNF-alpha vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfa.mods, plist = tnfa.func.pvals, test = 'faq',
+                           marker = 'tnfa', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfa.del.mods, plist = tnfa.del.func.pvals, test = 'faq',
+                           marker = 'tnfa', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsection{TNFR1}
@@ -3474,14 +3846,14 @@ latex.results(tnfr1.adl.results, 'TNFR1', 'ADL Scores, Models Without Delirium')
 latex.results(tnfr1.del.adl.results, 'TNFR1', 'ADL Scores, Models With Delirium')
 @
 
-%' <<printtnfr1adl, results='asis', fig.cap = 'TNFR1 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'adl',
-%'                            marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'adl',
-%'                            marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printtnfr1adl, results='asis', fig.cap = 'TNFR1 vs. ADL Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'adl',
+                           marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'adl',
+                           marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \clearpage
 \subsubsection{FAQ}
@@ -3490,14 +3862,14 @@ latex.results(tnfr1.faq.results, 'TNFR1', 'FAQ Scores, Models Without Delirium')
 latex.results(tnfr1.del.faq.results, 'TNFR1', 'FAQ Scores, Models With Delirium')
 @
 
-%' <<printtnfr1faq, results='asis', fig.cap = 'TNFR1 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
-%' multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'faq',
-%'                            marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
-%'           funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'faq',
-%'                            marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
-%'           layout = matrix(1:2, ncol = 1))
-%'
-%' @
+<<printtnfr1faq, results='asis', fig.cap = 'TNFR1 vs. FAQ Scores', fig.align = 'center', fig.width = 10, fig.height = 6.5, fig.pos = '!h'>>=
+multiplot(funcresults.plot(modlist = tnfr1.mods, plist = tnfr1.func.pvals, test = 'faq',
+                           marker = 'tnfr1', xlab.addon = 'Models Without Delirium'),
+          funcresults.plot(modlist = tnfr1.del.mods, plist = tnfr1.del.func.pvals, test = 'faq',
+                           marker = 'tnfr1', xlab.addon = 'Models With Delirium'),
+          layout = matrix(1:2, ncol = 1))
+
+@
 
 \end{landscape}
 
