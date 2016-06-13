@@ -1243,116 +1243,100 @@ covar.del.cog <- "rcs(age.enroll, 3) + rcs(charlson.score, 3) + rcs(edu, 3) + rc
 
 ## Functional outcomes
 ## Delirium *not* included
-covar.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + rcs(markervar, 3) | age.enroll + adl.e"
-covar.func.nobio <- gsub(' + rcs(markervar, 3)', '', covar.func, fixed = TRUE)
+covar.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + markervar + markervar.p"
+covar.func.nobio <- gsub(' + markervar + markervar.p', '', covar.func, fixed = TRUE)
 
 ## Delirium included
-covar.del.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + del.s.imp + rcs(markervar, 3) | age.enroll + adl.e"
-covar.del.func.nobio <- gsub(' + rcs(markervar, 3)', '', covar.del.func, fixed = TRUE)
+covar.del.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + del.s.imp + markervar + markervar.p"
+covar.del.func.nobio <- gsub(' + markervar + markervar.p', '', covar.del.func, fixed = TRUE)
 
 ## For functional outcomes, fit models without biomarker terms to use for LR test
 ## ADL, mean/first
 nobio.adl.mf.nowt.3 <- with(mice.mean.3,
-                            zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
-                                     dist = 'negbin'))
+                            glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
 nobio.adl.mf.wt.3 <- with(mice.mean.3,
-                          zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
-                                   weights = wt.func.3, dist = 'negbin'))
+                          glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
 nobio.adl.mf.nowt.12 <- with(mice.mean.12,
-                             zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
-                                      dist = 'negbin'))
+                             glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
 nobio.adl.mf.wt.12 <- with(mice.mean.12,
-                           zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
-                                    weights = wt.func.12, dist = 'negbin'))
+                           glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
 nobio.del.adl.mf.nowt.3 <- with(mice.mean.3,
-                                zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
-                                         dist = 'negbin'))
+                                glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
 nobio.del.adl.mf.wt.3 <- with(mice.mean.3,
-                              zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
-                                       weights = wt.func.3, dist = 'negbin'))
+                              glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
 nobio.del.adl.mf.nowt.12 <- with(mice.mean.12,
-                                 zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
-                                          dist = 'negbin'))
+                                 glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
 nobio.del.adl.mf.wt.12 <- with(mice.mean.12,
-                               zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
-                                        weights = wt.func.12, dist = 'negbin'))
+                               glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
 
 ## ADL, percent change
 nobio.adl.pc.nowt.3 <- with(mice.pctchg.3,
-                            zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
-                                     dist = 'negbin'))
+                            glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio))))
 nobio.adl.pc.wt.3 <- with(mice.pctchg.3,
-                          zeroinfl(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
-                                   weights = wt.func.3, dist = 'negbin'))
+                          glm.nb(formula(paste('adl.totscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
 nobio.adl.pc.nowt.12 <- with(mice.pctchg.12,
-                          zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
-                                   dist = 'negbin'))
+                             glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio))))
 nobio.adl.pc.wt.12 <- with(mice.pctchg.12,
-                           zeroinfl(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
-                                    weights = wt.func.12, dist = 'negbin'))
+                           glm.nb(formula(paste('adl.totscore.12 ~', covar.func.nobio)),
+                                  weights = wt.func.12))
 nobio.del.adl.pc.nowt.3 <- with(mice.pctchg.3,
-                                zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
-                                         dist = 'negbin'))
+                                glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio))))
 nobio.del.adl.pc.wt.3 <- with(mice.pctchg.3,
-                              zeroinfl(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
-                                       weights = wt.func.3, dist = 'negbin'))
+                              glm.nb(formula(paste('adl.totscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
 nobio.del.adl.pc.nowt.12 <- with(mice.pctchg.12,
-                                 zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
-                                          dist = 'negbin'))
+                                 glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio))))
 nobio.del.adl.pc.wt.12 <- with(mice.pctchg.12,
-                               zeroinfl(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
-                                        weights = wt.func.12, dist = 'negbin'))
+                               glm.nb(formula(paste('adl.totscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
 
 ## FAQ, mean/first
 nobio.faq.mf.nowt.3 <- with(mice.mean.3,
-                            zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
-                                     dist = 'negbin'))
+                            glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
 nobio.faq.mf.wt.3 <- with(mice.mean.3,
-                          zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
-                                   weights = wt.func.3, dist = 'negbin'))
+                          glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
 nobio.faq.mf.nowt.12 <- with(mice.mean.12,
-                             zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
+                             glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
 nobio.faq.mf.wt.12 <- with(mice.mean.12,
-                           zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
-                                    weights = wt.func.12, dist = 'negbin'))
+                           glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                                  weights = wt.func.12))
 nobio.del.faq.mf.nowt.3 <- with(mice.mean.3,
-                                zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
-                                         dist = 'negbin'))
+                                glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
 nobio.del.faq.mf.wt.3 <- with(mice.mean.3,
-                              zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
-                                       weights = wt.func.3, dist = 'negbin'))
+                              glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
 nobio.del.faq.mf.nowt.12 <- with(mice.mean.12,
-                                 zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
-                                          dist = 'negbin'))
+                                 glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
 nobio.del.faq.mf.wt.12 <- with(mice.mean.12,
-                               zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
-                                        weights = wt.func.12, dist = 'negbin'))
+                               glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
 
 ## FAQ, percent change
 nobio.faq.pc.nowt.3 <- with(mice.pctchg.3,
-                            zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
-                                     dist = 'negbin'))
+                            glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio))))
 nobio.faq.pc.wt.3 <- with(mice.pctchg.3,
-                          zeroinfl(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
-                                   weights = wt.func.3, dist = 'negbin'))
+                          glm.nb(formula(paste('faq.rdscore.3 ~', covar.func.nobio)),
+                                 weights = wt.func.3))
 nobio.faq.pc.nowt.12 <- with(mice.pctchg.12,
-                             zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
-                                      dist = 'negbin'))
+                             glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio))))
 nobio.faq.pc.wt.12 <- with(mice.pctchg.12,
-                           zeroinfl(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
-                                    weights = wt.func.12, dist = 'negbin'))
+                           glm.nb(formula(paste('faq.rdscore.12 ~', covar.func.nobio)),
+                                  weights = wt.func.12))
 nobio.del.faq.pc.nowt.3 <- with(mice.pctchg.3,
-                                zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
-                                         dist = 'negbin'))
+                                glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio))))
 nobio.del.faq.pc.wt.3 <- with(mice.pctchg.3,
-                              zeroinfl(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
-                                       weights = wt.func.3, dist = 'negbin'))
+                              glm.nb(formula(paste('faq.rdscore.3 ~', covar.del.func.nobio)),
+                                     weights = wt.func.3))
 nobio.del.faq.pc.nowt.12 <- with(mice.pctchg.12,
-                                 zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
-                                          dist = 'negbin'))
+                                 glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio))))
 nobio.del.faq.pc.wt.12 <- with(mice.pctchg.12,
-                               zeroinfl(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
-                                        weights = wt.func.12, dist = 'negbin'))
+                               glm.nb(formula(paste('faq.rdscore.12 ~', covar.del.func.nobio)),
+                                      weights = wt.func.12))
 
 ## Function to create model formulas
 make.modform <- function(outcome,
