@@ -36,7 +36,7 @@ library(tidyr)
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'none'
+rerun.analyses <- 'all'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -356,6 +356,48 @@ model.fu.data <- all.fu %>%
 ## Create single data set
 model.data <- model.data %>%
   left_join(model.fu.data, by = 'id')
+
+## Create manual variables for nonlinear biomarker terms for NB models
+n.knots.bio <- 3
+model.data$crp.mean.t.p <- as.numeric(rcspline.eval(model.data$crp.mean.t, nk = n.knots.bio))
+model.data$crp.first.t.p <- as.numeric(rcspline.eval(model.data$crp.first.t, nk = n.knots.bio))
+model.data$crp.pctchg.p <- as.numeric(rcspline.eval(model.data$crp.pctchg, nk = n.knots.bio))
+model.data$ifngamma.mean.t.p <-
+  as.numeric(rcspline.eval(model.data$ifngamma.mean.t, nk = n.knots.bio))
+model.data$ifngamma.first.t.p <-
+  as.numeric(rcspline.eval(model.data$ifngamma.first.t, nk = n.knots.bio))
+model.data$ifngamma.pctchg.p <-
+  as.numeric(rcspline.eval(model.data$ifngamma.pctchg, nk = n.knots.bio))
+model.data$il10.mean.t.p <- as.numeric(rcspline.eval(model.data$il10.mean.t, nk = n.knots.bio))
+model.data$il10.first.t.p <- as.numeric(rcspline.eval(model.data$il10.first.t, nk = n.knots.bio))
+model.data$il10.pctchg.p <- as.numeric(rcspline.eval(model.data$il10.pctchg, nk = n.knots.bio))
+model.data$il12.mean.t.p <- as.numeric(rcspline.eval(model.data$il12.mean.t, nk = n.knots.bio))
+model.data$il12.first.t.p <- as.numeric(rcspline.eval(model.data$il12.first.t, nk = n.knots.bio))
+model.data$il12.pctchg.p <- as.numeric(rcspline.eval(model.data$il12.pctchg, nk = n.knots.bio))
+model.data$il1b.mean.t.p <- as.numeric(rcspline.eval(model.data$il1b.mean.t, nk = n.knots.bio))
+model.data$il1b.first.t.p <- as.numeric(rcspline.eval(model.data$il1b.first.t, nk = n.knots.bio))
+model.data$il1b.pctchg.p <- as.numeric(rcspline.eval(model.data$il1b.pctchg, nk = n.knots.bio))
+model.data$il6.mean.t.p <- as.numeric(rcspline.eval(model.data$il6.mean.t, nk = n.knots.bio))
+model.data$il6.first.t.p <- as.numeric(rcspline.eval(model.data$il6.first.t, nk = n.knots.bio))
+model.data$il6.pctchg.p <- as.numeric(rcspline.eval(model.data$il6.pctchg, nk = n.knots.bio))
+model.data$il8.mean.t.p <- as.numeric(rcspline.eval(model.data$il8.mean.t, nk = n.knots.bio))
+model.data$il8.first.t.p <- as.numeric(rcspline.eval(model.data$il8.first.t, nk = n.knots.bio))
+model.data$il8.pctchg.p <- as.numeric(rcspline.eval(model.data$il8.pctchg, nk = n.knots.bio))
+model.data$mmp9.mean.t.p <- as.numeric(rcspline.eval(model.data$mmp9.mean.t, nk = n.knots.bio))
+model.data$mmp9.first.t.p <- as.numeric(rcspline.eval(model.data$mmp9.first.t, nk = n.knots.bio))
+model.data$mmp9.pctchg.p <- as.numeric(rcspline.eval(model.data$mmp9.pctchg, nk = n.knots.bio))
+model.data$proteinc.mean.t.p <-
+  as.numeric(rcspline.eval(model.data$proteinc.mean.t, nk = n.knots.bio))
+model.data$proteinc.first.t.p <-
+  as.numeric(rcspline.eval(model.data$proteinc.first.t, nk = n.knots.bio))
+model.data$proteinc.pctchg.p <-
+  as.numeric(rcspline.eval(model.data$proteinc.pctchg, nk = n.knots.bio))
+model.data$tnfa.mean.t.p <- as.numeric(rcspline.eval(model.data$tnfa.mean.t, nk = n.knots.bio))
+model.data$tnfa.first.t.p <- as.numeric(rcspline.eval(model.data$tnfa.first.t, nk = n.knots.bio))
+model.data$tnfa.pctchg.p <- as.numeric(rcspline.eval(model.data$tnfa.pctchg, nk = n.knots.bio))
+model.data$tnfr1.mean.t.p <- as.numeric(rcspline.eval(model.data$tnfr1.mean.t, nk = n.knots.bio))
+model.data$tnfr1.first.t.p <- as.numeric(rcspline.eval(model.data$tnfr1.first.t, nk = n.knots.bio))
+model.data$tnfr1.pctchg.p <- as.numeric(rcspline.eval(model.data$tnfr1.pctchg, nk = n.knots.bio))
 
 ## Add variable labels for tables
 label(model.data$cog.cohort.3) <- 'In cognitive analysis cohort, 3m'
@@ -1050,15 +1092,21 @@ always.use <- c('age.enroll', 'charlson.score', 'edu', 'iqcode.score.e', 'stroke
 model.data.func.3 <- model.data[model.data$func.cohort.3,
                                 c(always.use,
                                   gsub('\\.imp', '\\.mean.t', biomarker.vnames),
+                                  gsub('\\.imp', '\\.mean.t.p', biomarker.vnames),
                                   gsub('\\.imp', '\\.first.t', biomarker.vnames),
+                                  gsub('\\.imp', '\\.first.t.p', biomarker.vnames),
                                   gsub('\\.imp', '\\.pctchg', biomarker.vnames),
+                                  gsub('\\.imp', '\\.pctchg.p', biomarker.vnames),
                                   'wt.func.3')]
 
 model.data.func.12 <- model.data[model.data$func.cohort.12,
                                  c(always.use,
                                    gsub('\\.imp', '\\.mean.t', biomarker.vnames),
+                                   gsub('\\.imp', '\\.mean.t.p', biomarker.vnames),
                                    gsub('\\.imp', '\\.first.t', biomarker.vnames),
+                                   gsub('\\.imp', '\\.first.t.p', biomarker.vnames),
                                    gsub('\\.imp', '\\.pctchg', biomarker.vnames),
+                                   gsub('\\.imp', '\\.pctchg.p', biomarker.vnames),
                                    'wt.func.12')]
 
 model.data.pctchg.func.3 <-
@@ -1131,28 +1179,25 @@ if(rerun.imputed){
 
   ## Use mice for functional outcomes ##
   ## Create prediction matrix to use in mice() (same applies to both time points) ##
-  ## Create vector that is all 1s; function will replace diagonal and unused biomarker measures
-  ##  with 0s
-  tmp <- c(rep(1, ncol(model.data.func.3) - 1), 0)
-  names(tmp) <- colnames(model.data.func.3)
   create.mice.predmat <- function(marker.measure = c('mean', 'first', 'pctchg')){
-    tmpmat <- do.call(rbind,
-                      lapply(names(model.data.func.3), FUN = function(x){
-                        tmp2 <- tmp
-
-                        ## Which marker measures are *not* being used?
-                        not.used <- setdiff(c('mean', 'first', 'pctchg'), marker.measure)
-                        not.used <- gsub('mean', 'mean\\.t', not.used)
-                        not.used <- gsub('first', 'first\\.t', not.used)
-
-                        replace.vars <-
-                          unique(c(x,
-                                   gsub('\\.imp', paste0('\\.', not.used[1]), biomarker.vnames),
-                                   gsub('\\.imp', paste0('\\.', not.used[2]), biomarker.vnames)))
-
-                        tmp2[replace.vars] <- 0
-                        return(tmp2)
-                      }))
+    ## Which marker measures are *not* being used?
+    meas.not.used <- setdiff(c('mean', 'first', 'pctchg'), marker.measure)
+    meas.not.used <- gsub('mean', 'mean\\.t', meas.not.used)
+    meas.not.used <- gsub('first', 'first\\.t', meas.not.used)
+    
+    ## Which variable names should not be used?
+    cols.not.used <- unlist(lapply(meas.not.used,
+                                   FUN = function(x){ grep(x, names(tmp), fixed = TRUE) }))
+    cols.not.used <- c(cols.not.used, grep('^wt\\.func', names(model.data.func.3)))
+    
+    ## Initialize matrix: all 1s
+    tmpmat <- matrix(1, nrow = ncol(model.data.func.3), ncol = ncol(model.data.func.3))
+    
+    ## Set diagonal to 0
+    tmpmat[row(tmpmat) == col(tmpmat)] <- 0
+    
+    ## Set columns for variables we're not using to 0
+    tmpmat[,cols.not.used] <- 0
 
     rownames(tmpmat) <- colnames(tmpmat) <- names(model.data.func.3)
     return(tmpmat)
@@ -1670,7 +1715,7 @@ if(rerun.models){
        tnfr1.mods, tnfr1.del.mods,
        file = 'run_marker_mods_objects.Rdata')
 } else{
-  load('/Users/jthompson/run_marker_mods_objects.Rdata')
+  load('run_marker_mods_objects.Rdata')
 }
 
 ## -- Function to check linear model diagnostics ---------------------------------------------------
