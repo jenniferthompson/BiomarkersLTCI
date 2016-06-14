@@ -1347,11 +1347,19 @@ make.modform <- function(outcome,
 }
 
 ## -- Function to run all models for a given biomarker ---------------------------------------------
+## Cutoff for p-value determining whether to keep nonlinear term(s) in each model
+pcutoff <- 0.2
+use.method <- 'likelihood'
+
 ## marker: string representing prefix for biomarker variable (eg, "crp")
 ## cog.covar: string representing righthand side of model spec for cognitive outcomes
 ## func.covar: string representing righthand side of model spec for functional outcomes
    ## both the above should include "markervar" for gsubbing actual biomarker variable names
 run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.func){
+  ## Create formulas using only linear terms
+  cog.covar.lin <- gsub('rcs\\(', '', gsub(', [0-9]+\\)', '', cog.covar))
+  func.covar.lin <- gsub(' + markervar.p', '', func.covar, fixed = TRUE)
+  
   ## Create character string representing biomarker variable (+ transformation, if needed) to
   ## include in model formulas
   ## Currently, **no transformations** for % change - negative values create problems
@@ -1366,6 +1374,16 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   mean.rbans.nowt.3 <-
     fit.mult.impute(mean.rbans3.form,
                     fitter = ols, xtrans = areg.cog.mean.3, data = model.data.cog.3)
+  mean.rbans.3.pnl <- anova(mean.rbans.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(mean.rbans.3.pnl > pcutoff){
+    mean.rbans3.form <-
+      as.formula(make.modform('rbans.global.score.3', transmarker.mean, cog.covar.lin))
+    mean.rbans.nowt.3 <-
+      fit.mult.impute(mean.rbans3.form,
+                      fitter = ols, xtrans = areg.cog.mean.3, data = model.data.cog.3)
+  }
+  
   mean.rbans.wt.3 <-
     fit.mult.impute(mean.rbans3.form,
                     fitter = ols.fix, xtrans = areg.cog.mean.3, weights = wt.cog.3,
@@ -1376,6 +1394,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   mean.rbans.nowt.12 <-
     fit.mult.impute(mean.rbans12.form,
                     fitter = ols, xtrans = areg.cog.mean.12, data = model.data.cog.12)
+  
+  mean.rbans.12.pnl <- anova(mean.rbans.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(mean.rbans.12.pnl > pcutoff){
+    mean.rbans12.form <-
+      as.formula(make.modform('rbans.global.score.12', transmarker.mean, cog.covar.lin))
+    mean.rbans.nowt.3 <-
+      fit.mult.impute(mean.rbans12.form,
+                      fitter = ols, xtrans = areg.cog.mean.12, data = model.data.cog.12)
+  }
+  
   mean.rbans.wt.12 <-
     fit.mult.impute(mean.rbans12.form,
                     fitter = ols.fix, xtrans = areg.cog.mean.12, weights = wt.cog.12,
@@ -1387,6 +1416,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   first.rbans.nowt.3 <-
     fit.mult.impute(first.rbans3.form,
                     fitter = ols, xtrans = areg.cog.first.3, data = model.data.cog.3)
+
+  first.rbans.3.pnl <- anova(first.rbans.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(first.rbans.3.pnl > pcutoff){
+    first.rbans3.form <-
+      as.formula(make.modform('rbans.global.score.3', transmarker.first, cog.covar.lin))
+    first.rbans.nowt.3 <-
+      fit.mult.impute(first.rbans3.form,
+                      fitter = ols, xtrans = areg.cog.first.3, data = model.data.cog.3)
+  }
+    
   first.rbans.wt.3 <-
     fit.mult.impute(first.rbans3.form,
                     fitter = ols.fix, xtrans = areg.cog.first.3, weights = wt.cog.3,
@@ -1397,6 +1437,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   first.rbans.nowt.12 <-
     fit.mult.impute(first.rbans12.form,
                     fitter = ols, xtrans = areg.cog.first.12, data = model.data.cog.12)
+
+  first.rbans.12.pnl <- anova(first.rbans.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(first.rbans.12.pnl > pcutoff){
+    first.rbans12.form <-
+      as.formula(make.modform('rbans.global.score.12', transmarker.first, cog.covar.lin))
+    first.rbans.nowt.12 <-
+      fit.mult.impute(first.rbans12.form,
+                      fitter = ols, xtrans = areg.cog.first.12, data = model.data.cog.12)
+  }
+    
   first.rbans.wt.12 <-
     fit.mult.impute(first.rbans12.form,
                     fitter = ols.fix, xtrans = areg.cog.first.12,
@@ -1408,6 +1459,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   pctchg.rbans.nowt.3 <-
     fit.mult.impute(pctchg.rbans3.form, fitter = ols, xtrans = areg.cog.pctchg.3,
                     data = model.data.pctchg.cog.3)
+
+  pctchg.rbans.3.pnl <- anova(pctchg.rbans.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(pctchg.rbans.3.pnl > pcutoff){
+    pctchg.rbans3.form <-
+      as.formula(make.modform('rbans.global.score.3', transmarker.pctchg, cog.covar.lin))
+    pctchg.rbans.nowt.3 <-
+      fit.mult.impute(pctchg.rbans3.form,
+                      fitter = ols, xtrans = areg.cog.pctchg.3, data = model.data.cog.3)
+  }
+    
   pctchg.rbans.wt.3 <-
     fit.mult.impute(pctchg.rbans3.form, fitter = ols.fix, xtrans = areg.cog.pctchg.3,
                     weights = wt.cog.3, data = model.data.pctchg.cog.3)
@@ -1417,6 +1479,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   pctchg.rbans.nowt.12 <-
     fit.mult.impute(pctchg.rbans12.form, fitter = ols, xtrans = areg.cog.pctchg.12,
                     data = model.data.pctchg.cog.12)
+
+  pctchg.rbans.12.pnl <- anova(pctchg.rbans.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(pctchg.rbans.12.pnl > pcutoff){
+    pctchg.rbans12.form <-
+      as.formula(make.modform('rbans.global.score.12', transmarker.pctchg, cog.covar.lin))
+    pctchg.rbans.nowt.12 <-
+      fit.mult.impute(pctchg.rbans12.form,
+                      fitter = ols, xtrans = areg.cog.pctchg.12, data = model.data.cog.12)
+  }
+    
   pctchg.rbans.wt.12 <-
     fit.mult.impute(pctchg.rbans12.form, fitter = ols.fix, xtrans = areg.cog.pctchg.12,
                     weights = wt.cog.12, data = model.data.pctchg.cog.12)
@@ -1428,6 +1501,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   mean.trailb.nowt.3 <-
     fit.mult.impute(mean.trailb3.form, fitter = ols, xtrans = areg.cog.mean.3,
                     data = model.data.cog.3)
+
+  mean.trailb.3.pnl <- anova(mean.trailb.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(mean.trailb.3.pnl > pcutoff){
+    mean.trailb3.form <-
+      as.formula(make.modform('trail.b.tscore.3', transmarker.mean, cog.covar.lin))
+    mean.trailb.nowt.3 <-
+      fit.mult.impute(mean.trailb3.form,
+                      fitter = ols, xtrans = areg.cog.mean.3, data = model.data.cog.3)
+  }
+    
   mean.trailb.wt.3 <-
     fit.mult.impute(mean.trailb3.form, fitter = ols.fix, xtrans = areg.cog.mean.3,
                     weights = wt.cog.3,
@@ -1438,6 +1522,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   mean.trailb.nowt.12 <-
     fit.mult.impute(mean.trailb12.form, fitter = ols, xtrans = areg.cog.mean.12,
                     data = model.data.cog.12)
+
+  mean.trailb.12.pnl <- anova(mean.trailb.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(mean.trailb.12.pnl > pcutoff){
+    mean.trailb12.form <-
+      as.formula(make.modform('trail.b.tscore.12', transmarker.mean, cog.covar.lin))
+    mean.trailb.nowt.12 <-
+      fit.mult.impute(mean.trailb12.form,
+                      fitter = ols, xtrans = areg.cog.mean.12, data = model.data.cog.12)
+  }
+    
   mean.trailb.wt.12 <-
     fit.mult.impute(mean.trailb12.form,
                     fitter = ols.fix, xtrans = areg.cog.mean.12, weights = wt.cog.12,
@@ -1449,6 +1544,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   first.trailb.nowt.3 <-
     fit.mult.impute(first.trailb3.form, fitter = ols, xtrans = areg.cog.first.3,
                     data = model.data.cog.3)
+
+  first.trailb.3.pnl <- anova(first.trailb.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(first.trailb.3.pnl > pcutoff){
+    first.trailb3.form <-
+      as.formula(make.modform('trail.b.tscore.3', transmarker.first, cog.covar.lin))
+    first.trailb.nowt.3 <-
+      fit.mult.impute(first.trailb3.form,
+                      fitter = ols, xtrans = areg.cog.first.3, data = model.data.cog.3)
+  }
+    
   first.trailb.wt.3 <-
     fit.mult.impute(first.trailb3.form, fitter = ols.fix, xtrans = areg.cog.first.3,
                     weights = wt.cog.3, data = model.data.cog.3)
@@ -1458,6 +1564,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   first.trailb.nowt.12 <-
     fit.mult.impute(first.trailb12.form, fitter = ols, xtrans = areg.cog.first.12,
                     data = model.data.cog.12)
+
+  first.trailb.12.pnl <- anova(first.trailb.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(first.trailb.12.pnl > pcutoff){
+    first.trailb12.form <-
+      as.formula(make.modform('trail.b.tscore.12', transmarker.first, cog.covar.lin))
+    first.trailb.nowt.12 <-
+      fit.mult.impute(first.trailb12.form,
+                      fitter = ols, xtrans = areg.cog.first.12, data = model.data.cog.12)
+  }
+    
   first.trailb.wt.12 <-
     fit.mult.impute(first.trailb12.form, fitter = ols.fix, xtrans = areg.cog.first.12,
                     weights = wt.cog.12, data = model.data.cog.12)
@@ -1468,6 +1585,17 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   pctchg.trailb.nowt.3 <-
     fit.mult.impute(pctchg.trailb3.form, fitter = ols, xtrans = areg.cog.pctchg.3,
                     data = model.data.pctchg.cog.3)
+
+  pctchg.trailb.3.pnl <- anova(pctchg.trailb.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(pctchg.trailb.3.pnl > pcutoff){
+    pctchg.trailb3.form <-
+      as.formula(make.modform('trail.b.tscore.3', transmarker.pctchg, cog.covar.lin))
+    pctchg.trailb.nowt.3 <-
+      fit.mult.impute(pctchg.trailb3.form,
+                      fitter = ols, xtrans = areg.cog.pctchg.3, data = model.data.cog.3)
+  }
+    
   pctchg.trailb.wt.3 <-
     fit.mult.impute(pctchg.trailb3.form, fitter = ols.fix, xtrans = areg.cog.pctchg.3,
                     weights = wt.cog.3, data = model.data.pctchg.cog.3)
@@ -1477,113 +1605,246 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
   pctchg.trailb.nowt.12 <-
     fit.mult.impute(pctchg.trailb12.form, fitter = ols, xtrans = areg.cog.pctchg.12,
                     data = model.data.pctchg.cog.12)
+
+  pctchg.trailb.12.pnl <- anova(pctchg.trailb.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(pctchg.trailb.12.pnl > pcutoff){
+    pctchg.trailb12.form <-
+      as.formula(make.modform('trail.b.tscore.12', transmarker.pctchg, cog.covar.lin))
+    pctchg.trailb.nowt.12 <-
+      fit.mult.impute(pctchg.trailb12.form,
+                      fitter = ols, xtrans = areg.cog.pctchg.12, data = model.data.cog.12)
+  }
+    
   pctchg.trailb.wt.12 <-
     fit.mult.impute(pctchg.trailb12.form, fitter = ols.fix, xtrans = areg.cog.pctchg.12,
                     weights = wt.cog.12, data = model.data.pctchg.cog.12)
 
   ## ADL score ##
   ## Mean vs. ADL score
-  mean.adl3.formula <- make.modform('adl.totscore.3', transmarker.mean, func.covar)
+  mean.adl3.form <- make.modform('adl.totscore.3', transmarker.mean, func.covar)
   mean.adl.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, dist = 'negbin'))",
-                              mean.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s))", mean.adl3.form)))
+  mean.adl.nowt.3.lin <-
+    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s))",
+                              make.modform('adl.totscore.3', transmarker.mean, func.covar.lin))))
+  mean.adl.3.pnl <- pool.compare(mean.adl.nowt.3, mean.adl.nowt.3.lin,
+                                 method = use.method, data = mice.mean.3)$pvalue
+  
+  if(mean.adl.3.pnl > pcutoff){
+    mean.adl3.form <- make.modform('adl.totscore.3', transmarker.mean, func.covar.lin)
+    mean.adl.nowt.3 <- mean.adl.nowt.3.lin
+  }
+  
   mean.adl.wt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
-                              mean.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s, weights = wt.func.3))",
+                              mean.adl3.form)))
 
-  mean.adl12.formula <- make.modform('adl.totscore.12', transmarker.mean, func.covar)
+  mean.adl12.form <- make.modform('adl.totscore.12', transmarker.mean, func.covar)
   mean.adl.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, dist = 'negbin'))",
-                              mean.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s))", mean.adl12.form)))
+  mean.adl.nowt.12.lin <-
+    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s))",
+                              make.modform('adl.totscore.12', transmarker.mean, func.covar.lin))))
+  mean.adl.12.pnl <- pool.compare(mean.adl.nowt.12, mean.adl.nowt.12.lin,
+                                 method = use.method, data = mice.mean.12)$pvalue
+  
+  if(mean.adl.12.pnl > pcutoff){
+    mean.adl12.form <- make.modform('adl.totscore.12', transmarker.mean, func.covar.lin)
+    mean.adl.nowt.12 <- mean.adl.nowt.12.lin
+  }
+  
   mean.adl.wt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
-                              mean.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s, weights = wt.func.12))",
+                              mean.adl12.form)))
+
 
   ## First vs. ADL
-  first.adl3.formula <- make.modform('adl.totscore.3', transmarker.first, func.covar)
+  first.adl3.form <- make.modform('adl.totscore.3', transmarker.first, func.covar)
   first.adl.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, dist = 'negbin'))",
-                              first.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s))", first.adl3.form)))
+  first.adl.nowt.3.lin <-
+    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s))",
+                              make.modform('adl.totscore.3', transmarker.first, func.covar.lin))))
+  first.adl.3.pnl <- pool.compare(first.adl.nowt.3, first.adl.nowt.3.lin,
+                                  method = use.method, data = mice.first.3)$pvalue
+  
+  if(first.adl.3.pnl > pcutoff){
+    first.adl3.form <- make.modform('adl.totscore.3', transmarker.first, func.covar.lin)
+    first.adl.nowt.3 <- first.adl.nowt.3.lin
+  }
+  
   first.adl.wt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
-                              first.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s, weights = wt.func.3))",
+                              first.adl3.form)))
 
-  first.adl12.formula <- make.modform('adl.totscore.12', transmarker.first, func.covar)
+  first.adl12.form <- make.modform('adl.totscore.12', transmarker.first, func.covar)
   first.adl.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, dist = 'negbin'))",
-                              first.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s))", first.adl12.form)))
+  first.adl.nowt.12.lin <-
+    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s))",
+                              make.modform('adl.totscore.12', transmarker.first, func.covar.lin))))
+  first.adl.12.pnl <- pool.compare(first.adl.nowt.12, first.adl.nowt.12.lin,
+                                   method = use.method, data = mice.first.12)$pvalue
+  
+  if(first.adl.12.pnl > pcutoff){
+    first.adl12.form <- make.modform('adl.totscore.12', transmarker.first, func.covar.lin)
+    first.adl.nowt.12 <- first.adl.nowt.12.lin
+  }
+  
   first.adl.wt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
-                              first.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s, weights = wt.func.12))",
+                              first.adl12.form)))
 
   ## % change vs. ADL
-  pctchg.adl3.formula <- make.modform('adl.totscore.3', transmarker.pctchg, func.covar)
+  pctchg.adl3.form <- make.modform('adl.totscore.3', transmarker.pctchg, func.covar)
   pctchg.adl.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, dist = 'negbin'))",
-                              pctchg.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s))", pctchg.adl3.form)))
+  pctchg.adl.nowt.3.lin <-
+    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s))",
+                              make.modform('adl.totscore.3', transmarker.pctchg, func.covar.lin))))
+  pctchg.adl.3.pnl <- pool.compare(pctchg.adl.nowt.3, pctchg.adl.nowt.3.lin,
+                                   method = use.method, data = mice.pctchg.3)$pvalue
+  
+  if(pctchg.adl.3.pnl > pcutoff){
+    pctchg.adl3.form <- make.modform('adl.totscore.3', transmarker.pctchg, func.covar.lin)
+    pctchg.adl.nowt.3 <- pctchg.adl.nowt.3.lin
+  }
+  
   pctchg.adl.wt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
-                              pctchg.adl3.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s, weights = wt.func.3))",
+                              pctchg.adl3.form)))
 
-  pctchg.adl12.formula <- make.modform('adl.totscore.12', transmarker.pctchg, func.covar)
+  pctchg.adl12.form <- make.modform('adl.totscore.12', transmarker.pctchg, func.covar)
   pctchg.adl.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, dist = 'negbin'))",
-                              pctchg.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s))", pctchg.adl12.form)))
+  pctchg.adl.nowt.12.lin <-
+    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s))",
+                              make.modform('adl.totscore.12', transmarker.pctchg, func.covar.lin))))
+  pctchg.adl.12.pnl <- pool.compare(pctchg.adl.nowt.12, pctchg.adl.nowt.12.lin,
+                                    method = use.method, data = mice.pctchg.12)$pvalue
+  
+  if(pctchg.adl.12.pnl > pcutoff){
+    pctchg.adl12.form <- make.modform('adl.totscore.12', transmarker.pctchg, func.covar.lin)
+    pctchg.adl.nowt.12 <- pctchg.adl.nowt.12.lin
+  }
+  
   pctchg.adl.wt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
-                              pctchg.adl12.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s, weights = wt.func.12))",
+                              pctchg.adl12.form)))
 
   ## FAQ score ##
   ## Mean vs. FAQ score
-  mean.faq3.formula <- make.modform('faq.rdscore.3', transmarker.mean, func.covar)
+  mean.faq3.form <- make.modform('faq.rdscore.3', transmarker.mean, func.covar)
   mean.faq.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, dist = 'negbin'))",
-                              mean.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s))", mean.faq3.form)))
+  mean.faq.nowt.3.lin <-
+    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s))",
+                              make.modform('faq.rdscore.3', transmarker.mean, func.covar.lin))))
+  mean.faq.3.pnl <- pool.compare(mean.faq.nowt.3, mean.faq.nowt.3.lin,
+                                 method = use.method, data = mice.mean.3)$pvalue
+  
+  if(mean.faq.3.pnl > pcutoff){
+    mean.faq3.form <- make.modform('faq.rdscore.3', transmarker.mean, func.covar.lin)
+    mean.faq.nowt.3 <- mean.faq.nowt.3.lin
+  }
+  
   mean.faq.wt.3 <-
-    eval(parse(text = sprintf("with(mice.mean.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
-                              mean.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.mean.3, glm.nb(formula = %s, weights = wt.func.3))",
+                              mean.faq3.form)))
 
-  mean.faq12.formula <- make.modform('faq.rdscore.12', transmarker.mean, func.covar)
+  mean.faq12.form <- make.modform('faq.rdscore.12', transmarker.mean, func.covar)
   mean.faq.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, dist = 'negbin'))",
-                              mean.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s))", mean.faq12.form)))
+  mean.faq.nowt.12.lin <-
+    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s))",
+                              make.modform('faq.rdscore.12', transmarker.mean, func.covar.lin))))
+  mean.faq.12.pnl <- pool.compare(mean.faq.nowt.12, mean.faq.nowt.12.lin,
+                                 method = use.method, data = mice.mean.12)$pvalue
+  
+  if(mean.faq.12.pnl > pcutoff){
+    mean.faq12.form <- make.modform('faq.rdscore.12', transmarker.mean, func.covar.lin)
+    mean.faq.nowt.12 <- mean.faq.nowt.12.lin
+  }
+  
   mean.faq.wt.12 <-
-    eval(parse(text = sprintf("with(mice.mean.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
-                              mean.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.mean.12, glm.nb(formula = %s, weights = wt.func.12))",
+                              mean.faq12.form)))
+
 
   ## First vs. FAQ
-  first.faq3.formula <- make.modform('faq.rdscore.3', transmarker.first, func.covar)
+  first.faq3.form <- make.modform('faq.rdscore.3', transmarker.first, func.covar)
   first.faq.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, dist = 'negbin'))",
-                              first.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s))", first.faq3.form)))
+  first.faq.nowt.3.lin <-
+    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s))",
+                              make.modform('faq.rdscore.3', transmarker.first, func.covar.lin))))
+  first.faq.3.pnl <- pool.compare(first.faq.nowt.3, first.faq.nowt.3.lin,
+                                  method = use.method, data = mice.first.3)$pvalue
+  
+  if(first.faq.3.pnl > pcutoff){
+    first.faq3.form <- make.modform('faq.rdscore.3', transmarker.first, func.covar.lin)
+    first.faq.nowt.3 <- first.faq.nowt.3.lin
+  }
+  
   first.faq.wt.3 <-
-    eval(parse(text = sprintf("with(mice.first.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
-                              first.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.first.3, glm.nb(formula = %s, weights = wt.func.3))",
+                              first.faq3.form)))
 
-  first.faq12.formula <- make.modform('faq.rdscore.12', transmarker.first, func.covar)
+  first.faq12.form <- make.modform('faq.rdscore.12', transmarker.first, func.covar)
   first.faq.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, dist = 'negbin'))",
-                              first.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s))", first.faq12.form)))
+  first.faq.nowt.12.lin <-
+    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s))",
+                              make.modform('faq.rdscore.12', transmarker.first, func.covar.lin))))
+  first.faq.12.pnl <- pool.compare(first.faq.nowt.12, first.faq.nowt.12.lin,
+                                   method = use.method, data = mice.first.12)$pvalue
+  
+  if(first.faq.12.pnl > pcutoff){
+    first.faq12.form <- make.modform('faq.rdscore.12', transmarker.first, func.covar.lin)
+    first.faq.nowt.12 <- first.faq.nowt.12.lin
+  }
+  
   first.faq.wt.12 <-
-    eval(parse(text = sprintf("with(mice.first.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
-                              first.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.first.12, glm.nb(formula = %s, weights = wt.func.12))",
+                              first.faq12.form)))
 
   ## % change vs. FAQ
-  pctchg.faq3.formula <- make.modform('faq.rdscore.3', transmarker.pctchg, func.covar)
+  pctchg.faq3.form <- make.modform('faq.rdscore.3', transmarker.pctchg, func.covar)
   pctchg.faq.nowt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, dist = 'negbin'))",
-                              pctchg.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s))", pctchg.faq3.form)))
+  pctchg.faq.nowt.3.lin <-
+    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s))",
+                              make.modform('faq.rdscore.3', transmarker.pctchg, func.covar.lin))))
+  pctchg.faq.3.pnl <- pool.compare(pctchg.faq.nowt.3, pctchg.faq.nowt.3.lin,
+                                   method = use.method, data = mice.pctchg.3)$pvalue
+  
+  if(pctchg.faq.3.pnl > pcutoff){
+    pctchg.faq3.form <- make.modform('faq.rdscore.3', transmarker.pctchg, func.covar.lin)
+    pctchg.faq.nowt.3 <- pctchg.faq.nowt.3.lin
+  }
+  
   pctchg.faq.wt.3 <-
-    eval(parse(text = sprintf("with(mice.pctchg.3, zeroinfl(formula = %s, weights = wt.func.3, dist = 'negbin'))",
-                              pctchg.faq3.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.3, glm.nb(formula = %s, weights = wt.func.3))",
+                              pctchg.faq3.form)))
 
-  pctchg.faq12.formula <- make.modform('faq.rdscore.12', transmarker.pctchg, func.covar)
+  pctchg.faq12.form <- make.modform('faq.rdscore.12', transmarker.pctchg, func.covar)
   pctchg.faq.nowt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, dist = 'negbin'))",
-                              pctchg.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s))", pctchg.faq12.form)))
+  pctchg.faq.nowt.12.lin <-
+    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s))",
+                              make.modform('faq.rdscore.12', transmarker.pctchg, func.covar.lin))))
+  pctchg.faq.12.pnl <- pool.compare(pctchg.faq.nowt.12, pctchg.faq.nowt.12.lin,
+                                    method = use.method, data = mice.pctchg.12)$pvalue
+  
+  if(pctchg.faq.12.pnl > pcutoff){
+    pctchg.faq12.form <- make.modform('faq.rdscore.12', transmarker.pctchg, func.covar.lin)
+    pctchg.faq.nowt.12 <- pctchg.faq.nowt.12.lin
+  }
+  
   pctchg.faq.wt.12 <-
-    eval(parse(text = sprintf("with(mice.pctchg.12, zeroinfl(formula = %s, weights = wt.func.12, dist = 'negbin'))",
-                              pctchg.faq12.formula)))
+    eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s, weights = wt.func.12))",
+                              pctchg.faq12.form)))
 
   return(list('mean.rbans.nowt.3' = mean.rbans.nowt.3,
               'mean.rbans.wt.3' = mean.rbans.wt.3,
@@ -1632,7 +1893,31 @@ run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.fu
               'pctchg.faq.nowt.3' = pctchg.faq.nowt.3,
               'pctchg.faq.wt.3' = pctchg.faq.wt.3,
               'pctchg.faq.nowt.12' = pctchg.faq.nowt.12,
-              'pctchg.faq.wt.12' = pctchg.faq.wt.12))
+              'pctchg.faq.wt.12' = pctchg.faq.wt.12,
+              'mean.rbans.3.pnl' = mean.rbans.3.pnl,
+              'mean.rbans.12.pnl' = mean.rbans.12.pnl,
+              'first.rbans.3.pnl' = first.rbans.3.pnl,
+              'first.rbans.12.pnl' = first.rbans.12.pnl,
+              'pctchg.rbans.3.pnl' = pctchg.rbans.3.pnl,
+              'pctchg.rbans.12.pnl' = pctchg.rbans.12.pnl,
+              'mean.trailb.3.pnl' = mean.trailb.3.pnl,
+              'mean.trailb.12.pnl' = mean.trailb.12.pnl,
+              'first.trailb.3.pnl' = first.trailb.3.pnl,
+              'first.trailb.12.pnl' = first.trailb.12.pnl,
+              'pctchg.trailb.3.pnl' = pctchg.trailb.3.pnl,
+              'pctchg.trailb.12.pnl' = pctchg.trailb.12.pnl,
+              'mean.adl.3.pnl' = mean.adl.3.pnl,
+              'mean.adl.12.pnl' = mean.adl.12.pnl,
+              'first.adl.3.pnl' = first.adl.3.pnl,
+              'first.adl.12.pnl' = first.adl.12.pnl,
+              'pctchg.adl.3.pnl' = pctchg.adl.3.pnl,
+              'pctchg.adl.12.pnl' = pctchg.adl.12.pnl,
+              'mean.faq.3.pnl' = mean.faq.3.pnl,
+              'mean.faq.12.pnl' = mean.faq.12.pnl,
+              'first.faq.3.pnl' = first.faq.3.pnl,
+              'first.faq.12.pnl' = first.faq.12.pnl,
+              'pctchg.faq.3.pnl' = pctchg.faq.3.pnl,
+              'pctchg.faq.12.pnl' = pctchg.faq.12.pnl))
 }
 
 ## -- If requested, rerun models; otherwise, load saved objects ------------------------------------
