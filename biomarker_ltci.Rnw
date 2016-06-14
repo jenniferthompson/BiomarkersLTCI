@@ -1347,15 +1347,19 @@ make.modform <- function(outcome,
 }
 
 ## -- Function to run all models for a given biomarker ---------------------------------------------
-## Cutoff for p-value determining whether to keep nonlinear term(s) in each model
-pcutoff <- 0.2
-use.method <- 'likelihood'
-
 ## marker: string representing prefix for biomarker variable (eg, "crp")
 ## cog.covar: string representing righthand side of model spec for cognitive outcomes
 ## func.covar: string representing righthand side of model spec for functional outcomes
    ## both the above should include "markervar" for gsubbing actual biomarker variable names
-run.marker.mods <- function(marker, cog.covar = covar.cog, func.covar = covar.func){
+## pcutoff: cutoff to determine whether to keep or discard nonlinear terms from each model
+## use.method: Wald or likelihood; testing method for pool.compare()
+run.marker.mods <- function(marker,
+                            cog.covar = covar.cog,
+                            func.covar = covar.func,
+                            pcutoff = 0.2,
+                            use.method = c('likelihood', 'Wald')){
+  use.method <- match.arg(use.method)
+  
   ## Create formulas using only linear terms
   cog.covar.lin <- gsub('rcs\\(', '', gsub(', [0-9]+\\)', '', cog.covar))
   func.covar.lin <- gsub(' + markervar.p', '', func.covar, fixed = TRUE)
