@@ -2276,7 +2276,9 @@ if(rerun.models){
 # dev.off()
 
 ## -- Function to get LR p-values for biomarkers from functional outcome models --------------------
-func.bio.pvals <- function(mod.list, inc.del = FALSE, use.method = c('Wald', 'likelihood')){
+func.bio.pvals <- function(mod.list, inc.del = FALSE, use.method = c('likelihood', 'Wald')){
+  use.method <- match.arg(use.method)
+  
   if(inc.del){
     ref.adl.mf.nowt.3 <- nobio.del.adl.mf.nowt.3
     ref.adl.mf.wt.3 <- nobio.del.adl.mf.wt.3
@@ -2391,7 +2393,7 @@ func.bio.pvals <- function(mod.list, inc.del = FALSE, use.method = c('Wald', 'li
               'p.pctchg.faq.wt.12' = p.pctchg.faq.wt.12))
 }
 
-use.this.method <- 'Wald'
+use.this.method <- 'likelihood'
 
 crp.func.pvals <- func.bio.pvals(mod.list = crp.mods, use.method = use.this.method)
 ifngamma.func.pvals <- func.bio.pvals(mod.list = ifngamma.mods, use.method = use.this.method)
@@ -2440,16 +2442,69 @@ tnfr1.del.func.pvals <- func.bio.pvals(mod.list = tnfr1.del.mods,
                                        use.method = use.this.method)
 
 ## -- Need to calculate predicted values by hand ---------------------------------------------------
-## Create design matrix, adjusting all covariates to median or mode
-pred.vars <- intersect(names(crp.mods$mean.adl.nowt.3$analyses[[1]]$coefficients),
-                       names(model.data))
-pred.del.vars <- intersect(names(crp.del.mods$mean.adl.nowt.3$analyses[[1]]$coefficients),
-                           names(model.data))
-## All our current covariates are numeric and linear, which is helpful
-pred.vec <- unlist(lapply(pred.vars, FUN = function(predvar){
-  median(model.data[,predvar], na.rm = TRUE) }))
-pred.del.vec <- unlist(lapply(pred.del.vars, FUN = function(predvar){
-  median(model.data[,predvar], na.rm = TRUE) }))
+## -- Function to create design matrix for functional outcomes: will end up with one matrix per ----
+## -- marker measure per time point ----------------------------------------------------------------
+create.func.designmat <- function(marker.var,
+                                  xpctlimits = c(0.05, 0.95), ## Plotting range in %iles
+                                  dataset = model.data,       ## data set to use
+                                  cohort.var = NULL){         ## variable to use to restrict data
+  
+  ## Get vector of all model covariates
+  modvars <- unlist(strsplit(covar.del.func, ' + ', fixed = TRUE))
+  
+  ## Get unique values of biomarker, and corresponding nonlinear terms if needed
+  if(!is.null(cohort.var)){
+    usedata <- dataset[dataset[,cohort.var],]
+  } else{
+    usedata <- dataset
+  }
+  marker.vals <- sort(unique(usedata[, marker.var]))
+  marker.lims <- quantile(marker.vals, probs = xpctlimits, na.rm = TRUE)
+  marker.vals.trim <- marker.vals[marker.vals >= marker.lims[1] & marker.vals <= marker.lims[2]]
+  
+  marker.knots <- rcspline.eval(marker.vals, nk = 3, knots.only = TRUE)
+  markerp.vals <- as.numeric(rcspline.eval(marker.vals.trim, knots = marker.knots))
+
+  ## How many rows will be in resulting matrix? (number of biomarker values plotted)  
+  matrows <- length(marker.vals.trim)
+  
+  ## Get defaults (medians) for all variables that do not involve biomarker
+  vars.adj.to <- modvars[grep('markervar', modvars, invert = TRUE)]
+  adj.vals <- lapply(vars.adj.to, FUN = function(v){ median(usedata[,v], na.rm = TRUE) })
+  names(adj.vals) <- vars.adj.to
+  
+  ## Create columns for each covariate
+  designmat <- do.call(cbind,
+                       lapply(modvars, FUN = function(v){
+                         if(v == 'markervar'){
+                           marker.vals.trim
+                         } else if(v == 'markervar.p'){
+                           markerp.vals
+                         } else if(v %in% names(adj.vals)){
+                           rep(adj.vals[[v]], matrows)
+                         } else{
+                           rep(NA, matrows)
+                         }
+                       }))
+  colnames(designmat) <- gsub('markervar', marker.var, modvars)
+  
+  ## Add intercept column
+  cbind('(Intercept)' = rep(1, matrows), designmat)
+}
+
+## Create design matrices for each biomarker measurement variable
+biomarker.measures <- c(gsub('imp', 'mean\\.t', biomarker.vnames),
+                        gsub('imp', 'first\\.t', biomarker.vnames),
+                        gsub('imp', 'pctchg', biomarker.vnames))
+
+bio.designmats <- lapply(biomarker.measures, FUN = create.func.designmat)
+names(bio.designmats) <- biomarker.measures
+
+
+
+
+
+
 
 ## Function to, for each row in design matrix, calculate predicted value and SE from pooled results
 calc.funcresults <- function(biomod, pred.vals){
