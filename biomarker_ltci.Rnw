@@ -2497,42 +2497,49 @@ biomarker.measures <- c(gsub('imp', 'mean\\.t', biomarker.vnames),
                         gsub('imp', 'first\\.t', biomarker.vnames),
                         gsub('imp', 'pctchg', biomarker.vnames))
 
-bio.designmats <- lapply(biomarker.measures, FUN = create.func.designmat)
-names(bio.designmats) <- biomarker.measures
+bio.designmats.3 <-
+  lapply(biomarker.measures, FUN = create.func.designmat, cohort.var = 'func.cohort.3')
+bio.designmats.12 <-
+  lapply(biomarker.measures, FUN = create.func.designmat, cohort.var = 'func.cohort.12')
+names(bio.designmats.3) <- names(bio.designmats.12) <- biomarker.measures
 
 
+## -- Function to, for each row in design matrix, calculate predicted value & SE from negbin model
+calc.nbresults <- function(nbobj,          ## negbin model object (from glm.nb())
+                           designmat,      ## matrix of covariate values; ncols = coefs in nbobj
+                           xvar,           ## character string: name of variable to put on X axis
+                           intvar = NULL){ ## character string: name of interacting variable
 
+  is.mice <- 'mira' %in% class(nbobj)
 
+  ## Model object must be fit using glm.nb()
+  if(!('negbin' %in% class(nbobj) | (is.mice & 'negbin' %in% class(nbobj$analyses[[1]])))){
+    stop('nbobj must be of class negbin from glm.nb(), or a mice object using glm.nb to fit')
+  }
 
+  ## Get coefficients and vcov matrix, depending on whether object is imputed via mice or not
+  if(is.mice){
+    nb.coefs <- pool(nbobj)$qbar
+    nb.vcov <- pool(nbobj)$t
+  } else{
+    nb.coefs <- coef(nbobj)
+    nb.vcov <- vcov(nbobj)
+  }
+  coefnames <- names(nb.coefs)
 
-
-## Function to, for each row in design matrix, calculate predicted value and SE from pooled results
-calc.funcresults <- function(biomod, pred.vals){
-  coefnames <- names(biomod$analyses[[1]]$coefficients)
-  bioname <- strsplit(coefnames[length(pred.vals) + 2], ')')[[1]][2]
-
-  ## Get unique values of biomarker measure (5th-95th percentiles)
-  biovals <- sort(unique(model.data[,bioname]))
-  bioknots <- rcspline.eval(biovals, nk = 3, knots.only = TRUE)
-  biovals <- biovals[biovals >= bioknots[1] & biovals <= bioknots[3]]
-
-  ## Create full design matrix: same values for all covariates;
-  ##  differs in biomarker and nonlinear biomarker terms
-  designmat <-
-    do.call(rbind,
-            lapply(biovals, FUN = function(x){
-              c(1, pred.vals, x,
-                calc.spline(x, k1 = bioknots[1], k2 = bioknots[2], k3 = bioknots[3]))
-            }))
-
-  ## Pool model results, get coefficients and vcov matrix
-  pooled.mod <- pool(biomod)
-  pooled.coefs <- pooled.mod$qbar
-  pooled.vcov <- pooled.mod$ubar
+  if(sum(!(coefnames %in% colnames(designmat))) > 0){
+    stop("Variables in nbobj are not in designmat")
+  }
+  
+  if(!(xvar %in% colnames(designmat))){
+    stop("X axis variable name not in column names of design matrix")
+  }
+  
+  designmat <- designmat[,coefnames]
 
   ## Calculate linear predictors and their SEs
-  lp <- apply(designmat, MARGIN = 1, FUN = function(x){ sum(pooled.coefs * as.numeric(x)) })
-  lp.se <- apply(designmat, MARGIN = 1, FUN = function(x){ sqrt(t(x) %*% pooled.vcov %*% x) })
+  lp <- apply(designmat, MARGIN = 1, FUN = function(x){ sum(nb.coefs * as.numeric(x)) })
+  lp.se <- apply(designmat, MARGIN = 1, FUN = function(x){ sqrt(t(x) %*% nb.vcov %*% x) })
 
   ## Calculate LCL, UCLs for linear predictors
   lp.lcl <- lp - qnorm(0.975)*lp.se
@@ -2544,287 +2551,53 @@ calc.funcresults <- function(biomod, pred.vals){
   count.ucl <- exp(lp.ucl)
 
   ## Bind all results into data frame for plotting
-  return(as.data.frame(cbind(biovals, lp, lp.se, count.pe, count.lcl, count.ucl)))
+  xvalue <- designmat[,xvar]
+  if(!is.null(intvar)){
+    intvalue <- designmat[,intvar]
+    return(as.data.frame(cbind(xvalue, intvalue, lp, lp.se, count.pe, count.lcl, count.ucl)))
+  } else{
+    return(as.data.frame(cbind(xvalue, lp, lp.se, count.pe, count.lcl, count.ucl)))
+  }
 }
 
-## -- Function to create design matrices for count, zero portions given a zeroinfl object, ---------
-## --  X & interacting variables -------------------------------------------------------------------
-create.designmat.zinf <- function(modobj,                ## zeroinfl model object, or mice object
-                                                         ##  with zeroinfl fits
-                                  xvar,                  ## string; variable for x axis
-                                  intvar = NULL,         ## string; variable to interact
-                                  intvals = NULL,        ## vector; values to set int. variable to
-                                  dataset = model.data){ ## data frame to get unique X values from
-
-  ## miceobj must be of class zeroinfl
-  if(!('zeroinfl' %in% class(modobj)) == 0 &
-     !('mira' %in% class(modobj) & 'zeroinfl' %in% class(modobj$analyses[[1]]))){
-    stop('modobj must be of class zeroinfl from pscl library, or a mice object with zeroinfl fits')
-  }
-
-  if(!is.null(intvar) & length(grep(':', names(coef(modobj)))) == 0){
-    stop('Interacting variable is specified, but model does not include interaction terms')
-  }
-
-  if(!is.null(intvar) & is.null(intvals)){
-    stop('Interacting variable is specified, but no interacting values are specified')
-  }
-
-  ## Indicator for whether model is a mice object vs zeroinfl
-  is.mice <- 'mira' %in% class(modobj)
-
-  ## Get coefficient names for count and zero portions
-  if(is.mice){
-    coefnames <- names(coef(modobj$analyses[[1]]))
-  } else{
-    coefnames <- names(coef(modobj))
-  }
-  coefs.c <- coefnames[grep('^count', coefnames)]
-  coefs.z <- coefnames[grep('^zero', coefnames)]
-
-  ## Strip out "rcs(...)" and "count_/zero_"
-  coefs.c <- gsub("^[a-z]+_", "", gsub("rcs\\([a-z.,0-9 ]+\\)", "", coefs.c))
-  coefs.z <- gsub("^[a-z]+_", "", gsub("rcs\\([a-z.,0-9 ]+\\)", "", coefs.z))
-
-  ## Get unique values of variable on X axis
-  xvals <- sort(unique(dataset[,xvar]))
-  xknots <- rcspline.eval(xvals, nk = 3, knots.only = TRUE)
-  xvals <- xvals[xvals >= xknots[1] & xvals <= xknots[3]]
-  if(length(grep(paste0(xvar, "'"), coefnames)) > 0){
-    xvals.mat <- rcspline.eval(xvals, knots = xknots, inclx = TRUE)
-    colnames(xvals.mat) <- unlist(lapply(1:ncol(xvals.mat), FUN = function(c){
-      paste0('x', paste(rep("'", c - 1), collapse = '')) }))
-  } else{
-    xvals.mat <- matrix(xvals, ncol = 1)
-  }
-
-  ## Set values for all non-interaction columns
-  coefs.noint.c <- coefs.c[grep(':', coefs.c, invert = TRUE)]
-  coefs.int.c <- coefs.c[grep(':', coefs.c)]
-  coefs.noint.z <- coefs.z[grep(':', coefs.z, invert = TRUE)]
-  coefs.int.z <- coefs.z[grep(':', coefs.z)]
-
-  ## Function to fill in non-interaction columns
-  fill.predvals.noint <- function(name){
-    if(name == '(Intercept)'){
-      rep(1, length(xvals))
-    } else if(name == xvar){
-      xvals
-    } else if(name == paste0(xvar, "'")){
-      xvals.mat[,"x'"]
-#     } else if(!is.null(intvar) & name %in% c(intvar, paste0(intvar, "'"))){
-#       rep(NA, length(xvals))
-#     } else if(name %in% catvars){
-#       rep(0, length(xvals))
-    } else if(length(grep("'", name)) == 0){
-      median(dataset[,name], na.rm = TRUE)
-#     } else{
-#       get.med.spline(gsub('.$', '', name))
+## -- Function to create data set for plotting all biomarker measures vs a specific test at --------
+## -- both times, weighted and unweighted ----------------------------------------------------------
+create.func.plotdata <- function(marker,
+                                 marker.mods,
+                                 test = c('adl', 'faq')){
+  
+  test.mods <- unlist(lapply(c('mean', 'first', 'pctchg'),
+                             FUN = function(m){
+                               grep(paste0('^', m, '\\.', test, '\\.[no]*wt\\.[0-9]+$'),
+                                    names(marker.mods), value = TRUE) }))
+  
+  single.plot.data <- function(test.mod){
+    mod.info <- unlist(strsplit(test.mod, '.', fixed = TRUE))
+    names(mod.info) <- c('measure', 'test', 'weighted', 'time')
+    
+    if(mod.info['time'] == 3){
+      use.design <- bio.designmats.3
+    } else{
+      use.design <- bio.designmats.12
     }
+    
+    xvar <- paste(marker, mod.info['measure'], sep = '.')
+    if(mod.info['measure'] %in% c('mean', 'first')){
+      xvar <- paste(xvar, 't', sep = '.')
+    }
+    
+    plotdata <- calc.nbresults(nbobj = marker.mods[[test.mod]],
+                               designmat = use.design[[xvar]],
+                               xvar = xvar)
+    plotdata$measure <- mod.info['measure']
+    plotdata$time <- mod.info['time']
+    plotdata$weighted <- mod.info['weighted']
+    plotdata
   }
 
-  predmat.noint.c <- do.call(cbind, lapply(coefs.noint.c, FUN = fill.predvals.noint))
-  colnames(predmat.noint.c) <- coefs.noint.c
-
-  predmat.noint.z <- do.call(cbind, lapply(coefs.noint.z, FUN = fill.predvals.noint))
-  colnames(predmat.noint.z) <- coefs.noint.z
-
-#   ## If there is an interacting variable, repeat predmat.noint x number of unique values, then
-#   ##  fill in NA columns with unique values
-#   if(!is.null(intvar)){
-#     predmat.noint.c <-
-#       do.call(rbind, replicate(length(intvals), predmat.noint.c, simplify = FALSE))
-#     if(intvar %in% colnames(predmat.noint.c)){
-#       predmat.noint.c[,intvar] <-
-#         unlist(lapply(intvals, FUN = function(x){ rep(x, length(xvals)) }))
-#     }
-#
-#     predmat.noint.z <-
-#       do.call(rbind, replicate(length(intvals), predmat.noint.z, simplify = FALSE))
-#     if(intvar %in% colnames(predmat.noint.z)){
-#       predmat.noint.z[,intvar] <-
-#         unlist(lapply(intvals, FUN = function(x){ rep(x, length(xvals)) }))
-#     }
-#
-#     ## If interacting variable is nonlinear, determine knots for spline term
-#     if(length(grep(paste0(intvar, "'"), coefnames)) > 0){
-#       intknots <- rcspline.eval(dataset[,intvar], nk = 3, knots.only = TRUE)
-#       intspline <- unlist(lapply(intvals,
-#                                  FUN = calc.spline,
-#                                  k1 = intknots[1], k2 = intknots[2], k3 = intknots[3]))
-#       if(length(grep(paste0(intvar, "'"), coefs.c)) > 0){
-#         predmat.noint.c[,paste0(intvar, "'")] <-
-#           unlist(lapply(intspline, FUN = function(x){ rep(x, length(xvals)) }))
-#       }
-#
-#       if(length(grep(paste0(intvar, "'"), coefs.z)) > 0){
-#         predmat.noint.z[,paste0(intvar, "'")] <-
-#           unlist(lapply(intspline, FUN = function(x){ rep(x, length(xvals)) }))
-#       }
-#     }
-#   }
-
-  if(length(coefs.int.c) > 0){
-    predmat.int.c <- do.call(cbind,
-                             lapply(coefs.int.c, FUN = function(name){
-                               tmp <- strsplit(name, ':')[[1]]
-                               predmat.noint.c[,tmp[1]] * predmat.noint.c[,tmp[2]]
-                             }))
-    colnames(predmat.int.c) <- coefs.int.c
-    predmat.c <- cbind(predmat.noint.c, predmat.int.c)[,coefs.c]
-  } else{
-    predmat.c <- predmat.noint.c[,coefs.c]
-  }
-
-  if(length(coefs.int.z) > 0){
-    predmat.int.z <- do.call(cbind,
-                             lapply(coefs.int.z, FUN = function(name){
-                               tmp <- strsplit(name, ':')[[1]]
-                               predmat.noint.z[,tmp[1]] * predmat.noint.z[,tmp[2]]
-                             }))
-    colnames(predmat.int.z) <- coefs.int.z
-    predmat.c <- cbind(predmat.noint.z, predmat.int.z)[,coefs.z]
-  } else{
-    predmat.z <- predmat.noint.z[,coefs.z]
-  }
-
-  return(list('predmat.c' = predmat.c, 'predmat.z' = predmat.z))
-
+  ## Tomorrow: write lapply to rbind all data frames for a given marker/test and finalize plotting format
+  
 }
-
-## -- Function to get predicted response values from a zero-inflated NB model ----------------------
-zinf.response <- function(modobj,       ## Original model object
-                          design.zinf){ ## List of design matrices
-  ## Get coefficient estimates from modobj, split into count and zero portions
-  if('mira' %in% class(modobj)){
-    mod.coefs <- pool(modobj)$qbar
-  } else{
-    mod.coefs <- coef(modobj)
-  }
-
-  coefs.c <- mod.coefs[grep('^count_', names(mod.coefs))]
-  coefs.z <- mod.coefs[grep('^zero_', names(mod.coefs))]
-
-  ## Get linear predictors for count, zero portions
-  lp.c <- apply(design.zinf$predmat.c,
-                MARGIN = 1,
-                FUN = function(x){ sum(x * coefs.c) })
-  lp.z <- apply(design.zinf$predmat.z,
-                MARGIN = 1,
-                FUN = function(x){ sum(x * coefs.z) })
-
-  ## Get point estimates for each unique value of marker
-  ## exp(LPc) * (1 - (exp(LPz) / (1 + exp(LPz))))
-  pred.response <- exp(lp.c) * (1 - (exp(lp.z) / (1 + exp(lp.z))))
-
-  pred.response
-}
-
-## -- Function to get data sets of predicted values for plotting zero-inflated NB models -----------
-zinf.plotdata <- function(modobj,               ## Original model object to base bootstraps on
-                          xvar){                ## Main exposure variable
-  ## Does model include age/IL-6 interactions?
-  intmod <- (length(grep(':', modobj$call)) > 0)
-
-  ## Step 1: Create design matrices
-#   if(intmod){
-#     intvars <- c('age.div10', 'il6.log10')
-#     design.age <-
-#       create.designmat.zinf(modobj, xvar, intvar = 'age.div10', intvals = intvals.age / 10)
-#     design.il6 <-
-#       create.designmat.zinf(modobj, xvar, intvar = 'il6.log10', intvals = intvals.il6)
-#     design.all <- list(design.age, design.il6)
-#   } else{
-    design.all <- list(create.designmat.zinf(modobj, xvar))
-  # }
-
-  ## Step 2: Get point estimates from main model for each design matrix
-  pointests <- lapply(design.all, FUN = function(dmat){
-    zinf.response(modobj, dmat)
-  })
-
-  ## Step 3: bind xvar, predicted value
-  pred.final <- lapply(1:length(design.all), FUN = function(dmat){
-    tmp <- as.data.frame(cbind(design.all[[dmat]]$predmat.c[,xvar],
-                               pointests[[dmat]]))
-    names(tmp) <- c(xvar, 'pe')
-    tmp
-  })
-
-  return(pred.final)
-
-#   ## Step 3: Get predicted values for each bootstrapped data set, using model call in modobj
-#   formula.final <- as.character(modobj$call)[2]
-#
-#   mod.list <- vector('list', n.boot)
-#   n.succ <- n.fail <- 0
-#
-#   iter <- 1
-#   while(n.succ < n.boot){
-#     cur.model <- do.call(try.zeroinfl,
-#                          list(formula = as.formula(formula.final),
-#                               dist = 'negbin',
-#                               data = bootdata[[iter]]))
-#
-#     ## Did model have an error/warning? Or does it have more/fewer coefs than original?
-#     curmod.failed <- inherits(cur.model, 'try-error')
-#
-#     if(curmod.failed){
-#       n.fail <- n.fail + 1
-#       ## With first failure, begin a text file to store error messages; with following failues,
-#       ##  add subsequent errors to it
-#       if(n.fail == 1){ append.txt <- TRUE } else{ append.txt <- FALSE }
-#
-#       sink(file = paste('zeroinfl_errors_', xvar, '.txt', sep = ''), append = append.txt)
-#       cat('Errors and warnings for ', xvar, '\n\nFailure ', n.fail, ': ', cur.model[1], '\n',
-#           sep = '')
-#       sink()
-#       ## Otherwise, increment # successes, save model fit, coefficients, SEs, LR test if needed
-#     } else{
-#       n.succ <- n.succ + 1
-#       mod.list[[n.succ]] <- cur.model
-#     }
-#
-#     print(paste("Finished bootstrap iteration", iter, "for", xvar))
-#     iter <- iter + 1
-#   }
-#
-#   pred.all <- lapply(design.all, FUN = function(dmat){
-#     do.call(cbind,
-#             lapply(1:length(mod.list), FUN = function(mod){
-#               cat('Starting model predictions for model', mod, 'of', length(mod.list), '\n')
-#               zinf.response(mod.list[[mod]], dmat)
-#             }))
-#   })
-#
-#   ## Step 4: Get CIs for each row of the design matrix
-#   pred.cis <- lapply(pred.all, FUN = function(pmat){
-#     t(apply(pmat, MARGIN = 1, FUN = get.ci))
-#   })
-#
-#   ## Step 5: combine with original xvar, interacting value and point estimate
-#   if(intmod){
-#     pred.final <- lapply(1:length(design.all), FUN = function(dmat){
-#       tmp <- as.data.frame(cbind(design.all[[dmat]]$predmat.c[,c(xvar, intvars[dmat])],
-#                                  pointests[[dmat]],
-#                                  pred.cis[[dmat]]))
-#       names(tmp) <- c(xvar, intvars[dmat], 'pe', 'lcl', 'ucl')
-#       tmp
-#     })
-#   } else{
-#     pred.final <- lapply(1:length(design.all), FUN = function(dmat){
-#       tmp <- as.data.frame(cbind(design.all[[dmat]]$predmat.c[,xvar],
-#                                  pointests[[dmat]],
-#                                  pred.cis[[dmat]]))
-#       names(tmp) <- c(xvar, 'pe', 'lcl', 'ucl')
-#       tmp
-#     })
-#   }
-#
-#   return(list('pred.data' = pred.final, 'n.fail' = n.fail))
-
-}
-
 
 @
 
