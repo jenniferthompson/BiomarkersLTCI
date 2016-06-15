@@ -2627,96 +2627,6 @@ create.func.plotdata <- function(marker,
   test.plotdata
 }
 
-## Create data sets for all functional outcomes
-crp.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'crp', marker.mods = crp.mods, test = 'adl')
-crp.adl.del.plotdata <-
-  create.func.plotdata(marker = 'crp', marker.mods = crp.del.mods, test = 'adl')
-crp.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'crp', marker.mods = crp.mods, test = 'faq')
-crp.faq.del.plotdata <-
-  create.func.plotdata(marker = 'crp', marker.mods = crp.del.mods, test = 'faq')
-ifngamma.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'ifngamma', marker.mods = ifngamma.mods, test = 'adl')
-ifngamma.adl.del.plotdata <-
-  create.func.plotdata(marker = 'ifngamma', marker.mods = ifngamma.del.mods, test = 'adl')
-ifngamma.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'ifngamma', marker.mods = ifngamma.mods, test = 'faq')
-ifngamma.faq.del.plotdata <-
-  create.func.plotdata(marker = 'ifngamma', marker.mods = ifngamma.del.mods, test = 'faq')
-il10.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'il10', marker.mods = il10.mods, test = 'adl')
-il10.adl.del.plotdata <-
-  create.func.plotdata(marker = 'il10', marker.mods = il10.del.mods, test = 'adl')
-il10.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'il10', marker.mods = il10.mods, test = 'faq')
-il10.faq.del.plotdata <-
-  create.func.plotdata(marker = 'il10', marker.mods = il10.del.mods, test = 'faq')
-il12.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'il12', marker.mods = il12.mods, test = 'adl')
-il12.adl.del.plotdata <-
-  create.func.plotdata(marker = 'il12', marker.mods = il12.del.mods, test = 'adl')
-il12.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'il12', marker.mods = il12.mods, test = 'faq')
-il12.faq.del.plotdata <-
-  create.func.plotdata(marker = 'il12', marker.mods = il12.del.mods, test = 'faq')
-il1b.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'il1b', marker.mods = il1b.mods, test = 'adl')
-il1b.adl.del.plotdata <-
-  create.func.plotdata(marker = 'il1b', marker.mods = il1b.del.mods, test = 'adl')
-il1b.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'il1b', marker.mods = il1b.mods, test = 'faq')
-il1b.faq.del.plotdata <-
-  create.func.plotdata(marker = 'il1b', marker.mods = il1b.del.mods, test = 'faq')
-il6.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'il6', marker.mods = il6.mods, test = 'adl')
-il6.adl.del.plotdata <-
-  create.func.plotdata(marker = 'il6', marker.mods = il6.del.mods, test = 'adl')
-il6.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'il6', marker.mods = il6.mods, test = 'faq')
-il6.faq.del.plotdata <-
-  create.func.plotdata(marker = 'il6', marker.mods = il6.del.mods, test = 'faq')
-il8.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'il8', marker.mods = il8.mods, test = 'adl')
-il8.adl.del.plotdata <-
-  create.func.plotdata(marker = 'il8', marker.mods = il8.del.mods, test = 'adl')
-il8.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'il8', marker.mods = il8.mods, test = 'faq')
-il8.faq.del.plotdata <-
-  create.func.plotdata(marker = 'il8', marker.mods = il8.del.mods, test = 'faq')
-mmp9.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'mmp9', marker.mods = mmp9.mods, test = 'adl')
-mmp9.adl.del.plotdata <-
-  create.func.plotdata(marker = 'mmp9', marker.mods = mmp9.del.mods, test = 'adl')
-mmp9.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'mmp9', marker.mods = mmp9.mods, test = 'faq')
-mmp9.faq.del.plotdata <-
-  create.func.plotdata(marker = 'mmp9', marker.mods = mmp9.del.mods, test = 'faq')
-proteinc.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'proteinc', marker.mods = proteinc.mods, test = 'adl')
-proteinc.adl.del.plotdata <-
-  create.func.plotdata(marker = 'proteinc', marker.mods = proteinc.del.mods, test = 'adl')
-proteinc.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'proteinc', marker.mods = proteinc.mods, test = 'faq')
-proteinc.faq.del.plotdata <-
-  create.func.plotdata(marker = 'proteinc', marker.mods = proteinc.del.mods, test = 'faq')
-tnfa.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'tnfa', marker.mods = tnfa.mods, test = 'adl')
-tnfa.adl.del.plotdata <-
-  create.func.plotdata(marker = 'tnfa', marker.mods = tnfa.del.mods, test = 'adl')
-tnfa.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'tnfa', marker.mods = tnfa.mods, test = 'faq')
-tnfa.faq.del.plotdata <-
-  create.func.plotdata(marker = 'tnfa', marker.mods = tnfa.del.mods, test = 'faq')
-tnfr1.adl.nodel.plotdata <-
-  create.func.plotdata(marker = 'tnfr1', marker.mods = tnfr1.mods, test = 'adl')
-tnfr1.adl.del.plotdata <-
-  create.func.plotdata(marker = 'tnfr1', marker.mods = tnfr1.del.mods, test = 'adl')
-tnfr1.faq.nodel.plotdata <-
-  create.func.plotdata(marker = 'tnfr1', marker.mods = tnfr1.mods, test = 'faq')
-tnfr1.faq.del.plotdata <-
-  create.func.plotdata(marker = 'tnfr1', marker.mods = tnfr1.del.mods, test = 'faq')
-
 @
 
 <<getresults>>=
@@ -2771,12 +2681,13 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                                               nrow(modlist[[x]]$analyses[[1]]$model))
 
                               ## Which biomarker variable are we using?
-                              which.biovar <- grep(paste0('^', marker, '[a-z.]+$'),
-                                                   unlist(strsplit(grep(marker,
-                                                                        names(pool(modlist[[x]])$qbar),
-                                                                        value = TRUE),
-                                                                   ')')),
-                                                   value = TRUE)
+                              which.biovar <-
+                                grep(paste0('^', marker, '[a-z.]+$'),
+                                     unlist(strsplit(grep(marker,
+                                                          names(pool(modlist[[x]])$qbar),
+                                                          value = TRUE),
+                                                     ')')),
+                                     value = TRUE)
 
                               ## Get reference and comparison values
                               ref.val <- dd$limits['Low:effect', which.biovar]
@@ -2787,11 +2698,11 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                               mod.vcov <- pool(modlist[[x]])$t
 
                               ## Get knots to use for nonlinear terms
-                              bio.knots <- eval(parse(text = paste0('rcspline.eval(',
-                                                                    as.character(modlist[[x]]$call1[2]),
-                                                                    '$',
-                                                                    which.biovar,
-                                                                    ', nk = 3, knots.only = TRUE)')))
+                              bio.knots <-
+                                eval(parse(text = paste0('rcspline.eval(',
+                                                         as.character(modlist[[x]]$call1[2]), '$',
+                                                         which.biovar,
+                                                         ', nk = 3, knots.only = TRUE)')))
                               bio.knot.list <- list(bio.knots)
                               names(bio.knot.list) <- paste0('count_', which.biovar)
 
@@ -3076,7 +2987,7 @@ test.ylabs <- data.frame(testvar = c('rbans', 'trailb', 'adl', 'faq'),
 cogresults.plot <- function(modlist, ## List of model objects (eg, crp.mods)
                             test = c('rbans', 'trailb'), ## Test of interest
                             marker, ## String; biomarker prefix (eg, 'crp')
-                            xlab.addon = NULL){ ## Text added to X label (eg "Models Without Delirium")
+                            xlab.addon = NULL){ ## Text added to X label (eg "Models W/O Delirium")
 
   ## For all models in modlist which involve test of interest, get predicted values;
   ##  bind all predicted values in single data set, adding model name (eg,
@@ -3134,150 +3045,15 @@ cogresults.plot <- function(modlist, ## List of model objects (eg, crp.mods)
   return(marker.plot)
 }
 
-# ## Functional outcomes (negative binomial models)
-# funcresults.plot <- function(modlist,
-#                              plist,
-#                              test = c('adl', 'faq'),
-#                              marker,
-#                              xlab.addon = NULL){
-#
-#   ## Create data frame of p-value strings to add to each plot
-#   p.data <- data.frame(modtype = names(plist),
-#                        pval = as.numeric(plist))
-#   p.data <- p.data[p.data$modtype %in% grep(test, p.data$modtype, value = TRUE),] %>%
-#     ## Separate model name variable into pieces and use to create factors for plotting
-#     separate(modtype, into = c('p', 'measure', 'test', 'weight', 'time')) %>%
-#     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
-#                                ifelse(measure == 'first', 2, 3)),
-#                                levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
-#            timestr = factor(ifelse(time == 3, 1, 2),
-#                             levels = 1:2, labels = c('3 Months', '12 Months'))) %>%
-#     dplyr::select(-p, -measure, -test) %>%
-#     spread(key = weight, value = pval) %>%
-#     mutate(pval.string = paste0('Unweighted p: ', formatp(nowt),
-#                                 '\nWeighted p: ', formatp(wt)))
-#
-#   ## For all models in modlist which involve test of interest, get predicted values;
-#   ##  bind all predicted values in single data set, adding model name (eg,
-#   ##  mean.rbans.nowt.3) as variable
-#
-#   ## Is delirium included in model?
-#   if(length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0){
-#     use.pred.vals <- pred.del.vec
-#   } else{
-#     use.pred.vals <- pred.vec
-#   }
-#
-#   pred.data <- bind_rows(lapply(grep(test, names(modlist)), FUN = function(x){
-#     tmp <- calc.funcresults(modlist[[x]], use.pred.vals)
-#     tmp$modtype <- names(modlist)[x]
-#     tmp
-#   })) %>%
-#     ## Separate model name variable into pieces and use to create factors for plotting
-#     separate(modtype, into = c('measure', 'test', 'weight', 'time')) %>%
-#     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
-#                                ifelse(measure == 'first', 2, 3)),
-#                                levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
-#            timestr = factor(ifelse(time == 3, 1, 2),
-#                             levels = 1:2, labels = c('3 Months', '12 Months')))
-#
-#   ## Get X and Y values from pred.data for adding p-value text, add to p.data
-#   xvals <- group_by(pred.data, measurestr) %>% summarise(x.val = max(biovals))
-#   p.data <- p.data %>% left_join(xvals, by = 'measurestr') %>%
-#     mutate(y.val = max(pred.data$count.ucl, na.rm = TRUE))
-#
-#   ## Create X label string
-#   if(is.null(xlab.addon)){
-#     use.xlab <- paste('Measure of', toupper(marker))
-#   } else{
-#     use.xlab <- paste0('Measure of ', toupper(marker), ', ', xlab.addon)
-#   }
-#
-#
-#   ## Plot, with biomarker measures as columns and time points as rows
-#   marker.plot <- ggplot(aes(x = biovals), data = pred.data) +
-#     facet_grid(timestr ~ measurestr, scales = 'free_x') +
-#     geom_ribbon(aes(ymin = count.lcl, ymax = count.ucl, fill = weight), alpha = 0.4) +
-#     geom_line(aes(y = count.pe, colour = weight)) +
-#     geom_text(aes(x = x.val, y = y.val, label = pval.string),
-#               data = p.data, fontface = 'bold', hjust = 1, vjust = 1, size = 2) +
-#     scale_colour_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
-#     scale_fill_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
-#     xlab(use.xlab) +
-#     ylab(test.ylabs[match(test, test.ylabs$testvar), 'testylab']) +
-#     theme_bw() +
-#     theme(legend.position = 'bottom',
-#           legend.key.size = unit(0.25, "cm"),
-#           legend.text = element_text(size = 8),
-#           axis.ticks = element_line(colour = 'grey50'),
-#           axis.text = element_text(size = 8),
-#           axis.title.x = element_text(vjust = 0),
-#           strip.background = element_blank(),
-#           panel.margin = unit(0.5, 'lines'))
-#
-#   return(marker.plot)
-#
-# }
+## Cognitive outcomes (linear models)
+funcresults.plot <- function(modlist, ## List of model objects (eg, crp.mods)
+                             test = c('adl', 'faq'), ## Test of interest
+                             marker, ## String; biomarker prefix (eg, 'crp')
+                             xlab.addon = NULL){ ## Text added to X label ("Models W/O Delirium")
 
-## Functional outcomes (negative binomial models)
-funcresults.plot <- function(modlist,
-                             plist = NULL,
-                             test = c('adl', 'faq'),
-                             marker,
-                             xlab.addon = NULL){
-
-#   ## Create data frame of p-value strings to add to each plot
-#   p.data <- data.frame(modtype = names(plist),
-#                        pval = as.numeric(plist))
-#   p.data <- p.data[p.data$modtype %in% grep(test, p.data$modtype, value = TRUE),] %>%
-#     ## Separate model name variable into pieces and use to create factors for plotting
-#     separate(modtype, into = c('p', 'measure', 'test', 'weight', 'time')) %>%
-#     mutate(measurestr = factor(ifelse(measure == 'mean', 1,
-#                                       ifelse(measure == 'first', 2, 3)),
-#                                levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
-#            timestr = factor(ifelse(time == 3, 1, 2),
-#                             levels = 1:2, labels = c('3 Months', '12 Months'))) %>%
-#     dplyr::select(-p, -measure, -test) %>%
-#     spread(key = weight, value = pval) %>%
-#     mutate(pval.string = paste0('Unweighted p: ', formatp(nowt),
-#                                 '\nWeighted p: ', formatp(wt)))
-
-  ## For all models in modlist which involve test of interest, get predicted values;
-  ##  bind all predicted values in single data set, adding model name (eg,
-  ##  mean.rbans.nowt.3) as variable
-
-  ## Is delirium included in model?
-  inc.del <- length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0
-
-#   if(length(grep('del.s.imp', names(coef(modlist[[1]])))) > 0){
-#     use.pred.vals <- pred.del.vec
-#   } else{
-#     use.pred.vals <- pred.vec
-#   }
-
-  pred.data <- bind_rows(lapply(grep(test, names(modlist)), FUN = function(x){
-    use.meas <- strsplit(names(modlist)[x], '\\.')[[1]][1]
-    use.xvar <- paste(marker, use.meas, sep = '.')
-    use.xvar <- ifelse(use.meas %in% c('mean', 'first'), paste0(use.xvar, '.t'), use.xvar)
-
-    tmp <- zinf.plotdata(modlist[[x]], use.xvar)[[1]]
-    tmp$modtype <- names(modlist)[x]
-    names(tmp) <- gsub(use.xvar, 'biovals', names(tmp))
-    tmp
-  })) %>%
-    ## Separate model name variable into pieces and use to create factors for plotting
-    separate(modtype, into = c('measure', 'test', 'weight', 'time')) %>%
-    mutate(measurestr = factor(ifelse(measure == 'mean', 1,
-                                      ifelse(measure == 'first', 2, 3)),
-                               levels = 1:3, labels = c('Log10(Mean)', 'Log10(First)', '% Change')),
-           timestr = factor(ifelse(time == 3, 1, 2),
-                            levels = 1:2, labels = c('3 Months', '12 Months')))
-
-#   ## Get X and Y values from pred.data for adding p-value text, add to p.data
-#   xvals <- group_by(pred.data, measurestr) %>% summarise(x.val = max(biovals))
-#   p.data <- p.data %>% left_join(xvals, by = 'measurestr') %>%
-#     mutate(y.val = max(pred.data$count.ucl, na.rm = TRUE))
-
+  ## Get data set of predicted values
+  pred.data <- create.func.plotdata(marker = marker, marker.mods = modlist, test = test)
+  
   ## Create X label string
   if(is.null(xlab.addon)){
     use.xlab <- paste('Measure of', toupper(marker))
@@ -3285,19 +3061,15 @@ funcresults.plot <- function(modlist,
     use.xlab <- paste0('Measure of ', toupper(marker), ', ', xlab.addon)
   }
 
-  use.ylab <- ifelse(test == 'adl', 'Adjusted ADL Score', 'Adjusted FAQ Score')
-
   ## Plot, with biomarker measures as columns and time points as rows
-  marker.plot <- ggplot(aes(x = biovals), data = pred.data) +
-    facet_grid(timestr ~ measurestr, scales = 'free_x') +
-    # geom_ribbon(aes(ymin = count.lcl, ymax = count.ucl, fill = weight), alpha = 0.4) +
-    geom_line(aes(y = pe, colour = weight)) +
-#     geom_text(aes(x = x.val, y = y.val, label = pval.string),
-#               data = p.data, fontface = 'bold', hjust = 1, vjust = 1, size = 2) +
+  marker.plot <- ggplot(aes(x = xvalue), data = pred.data) +
+    facet_grid(time.f ~ measure.f, scales = 'free_x') +
+    geom_ribbon(aes(ymin = count.lcl, ymax = count.ucl, fill = weighted.f), alpha = 0.4) +
+    geom_line(aes(y = count.pe, colour = weighted.f)) +
     scale_colour_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
     scale_fill_discrete(name = '', labels = c('Unweighted', 'Weighted')) +
     xlab(use.xlab) +
-    ylab(use.ylab) +
+    ylab(test.ylabs[match(test, test.ylabs$testvar), 'testylab']) +
     theme_bw() +
     theme(legend.position = 'bottom',
           legend.key.size = unit(0.25, "cm"),
@@ -3309,7 +3081,6 @@ funcresults.plot <- function(modlist,
           panel.margin = unit(0.5, 'lines'))
 
   return(marker.plot)
-
 }
 
 @
