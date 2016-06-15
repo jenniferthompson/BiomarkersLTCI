@@ -149,16 +149,13 @@ if(Sys.info()['sysname'] == 'Darwin'){
   if(length(grep('Volumes', getwd())) > 0){
     load('/Volumes/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
     source('/Volumes/thomps23/R/multiplot.r')
-    source('/Volumes/thomps23/R/JTMisc/calc_ratioci.R')
   } else{
     load('braindata.Rdata')
     source('multiplot.r')
-    source('calc_ratioci.R')
   }
 } else{
   load('/home/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
   source('/home/thomps23/R/multiplot.r')
-  source('/home/thomps23/R/JTMisc/calc_ratioci.R')
 }
 
 ## -- Insert data management to combine BRAIN, MIND data sets --------------------------------------
@@ -2644,6 +2641,98 @@ formatp <- function(val){
 ## Set datadist for summary.rms()
 dd <- datadist(model.data); options(datadist = 'dd')
 
+## -- Function to calculate ratio, CI for a logit model (eg, negative binomial), using manual ------
+## -- variables for nonlinear and interaction terms ------------------------------------------------
+calc.ratioci.inflltci <- function(marker,
+                                  modlist,
+                                  modobj,
+                                  marker.adjust = NULL,
+                                  markerp.adjust = NULL,
+                                  alpha = 0.05){
+  
+  if(!(modobj %in% names(modlist))){
+    stop('modobj is not an element of modlist')
+  }
+  
+  ## Split name of model object to get model info
+  modinfo <- unlist(strsplit(modobj, '.', fixed = TRUE))
+  names(modinfo) <- c('measure', 'test', 'weighted', 'time')
+  
+  time <- as.numeric(tail(unlist(strsplit(modobj, '.', fixed = TRUE)), n = 1))
+  if(is.na(time)){
+    stop('modobj name appears to be incorrect')
+  }
+  
+  ## Data set to use: all patients in cohort at specific time point
+  usedata <- model.data[model.data[,paste0('func.cohort.', time)],]
+
+  ## Get name of X variable  
+  xvar <- paste0(marker, '.', modinfo['measure'])
+  if(modinfo['measure'] %in% c('mean', 'first')){
+    xvar <- paste0(xvar, '.t')
+  }
+  
+  ## Get model coefficients, vcov matrix
+  modcoefs <- pool(modlist[[modobj]])$qbar
+  modvcov <- pool(modlist[[modobj]])$t
+  
+  ## Determine what values to adjust biomarker terms to
+  ## (by default, 75th and 25th percentiles of time-specific data set)
+  if(is.null(marker.adjust)){
+    marker.adjust <- as.numeric(quantile(usedata[,xvar], probs = c(0.25, 0.75), na.rm = TRUE))
+  }
+  
+  ## If nonlinear term is included and no defaults given, get values to adjust nonlinear term to
+  if(is.null(markerp.adjust) & paste0(xvar, '.p') %in% names(modcoefs)){
+    marker.knots <- rcspline.eval(usedata[,xvar], nk = 3, knots.only = TRUE)
+    markerp.adjust <- as.numeric(rcspline.eval(marker.adjust, knots = marker.knots))
+  }
+  
+  if(length(!is.na(as.numeric(marker.adjust))) != 2){
+    stop('marker.adjust must have exactly two non-missing numeric values')
+  }
+  
+  ## Create named vectors of values to adjust to
+  ratiovars <- lapply(1:2, FUN = function(m){
+    tmp <- c('marker' = marker.adjust[m],
+             'marker.p' = markerp.adjust[m])
+    names(tmp) <- gsub('marker', xvar, names(tmp))
+    tmp
+  })
+  
+  use.coefs <- (1:length(modcoefs))[!is.na(pmatch(names(modcoefs), names(ratiovars[[1]])))]
+  use.betas <- modcoefs[use.coefs]
+  
+  ## Get vcov matrix for involved components
+  use.vcov <- modvcov[use.coefs, use.coefs]
+  
+  ## Calculate X values: vector 2 - vector 1
+  xvals <- ratiovars[[2]] - ratiovars[[1]]
+  xvals <- xvals[names(xvals) %in% names(modcoefs)]
+  
+  ## Calculate each component of linear predictor: beta * xvals
+  beta.x <- unlist(lapply(1:length(use.betas), FUN = function(b){
+    prod(c(use.betas[b], xvals[b]))
+  }))
+  
+  ratiovar.logor <- sum(beta.x)
+  ratiovar.or <- exp(ratiovar.logor)
+  
+  ## Calculate SE
+  ratiovar.se <- sqrt(xvals %*% use.vcov %*% xvals)
+  
+  critval <- 1 - alpha / 2
+  
+  ratiovar.lcl <- exp(ratiovar.logor - qnorm(critval)*ratiovar.se)
+  ratiovar.ucl <- exp(ratiovar.logor + qnorm(critval)*ratiovar.se)
+  
+  return(c('pointest' = ratiovar.or, 'lcl' = ratiovar.lcl, 'ucl' = ratiovar.ucl))
+}
+
+#### TOMORROW: TEST THIS FUNCTION THOROUGHLY
+
+
+
 ## -- Function to create results table ------------------------------------------------------------
 create.results.table <- function(modlist, ## List of model objects (eg, crp.mods)
                                  marker,  ## string with marker prefix (eg, 'crp')
@@ -2657,7 +2746,10 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
     ##  concatenate with name of model (eg, "mean.rbans.nowt.3")
     results.data <-
       as.data.frame(do.call(rbind,
-                            lapply(grep(test, names(modlist)), FUN = function(x){
+                            lapply(grep(paste0('\\.', test, '\\.[no]*wt\\.[0-9]+$'),
+                                        names(modlist),
+                                        value = TRUE),
+                                   FUN = function(x){
                               mod.n <- ifelse(test %in% c('rbans', 'trailb'),
                                               modlist[[x]]$stats['n'],
                                               nrow(modlist[[x]]$analyses[[1]]$model))
@@ -2674,42 +2766,48 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
   } else if(test %in% c('adl', 'faq')){
     results.data <-
       as.data.frame(do.call(rbind,
-                            lapply(grep(test, names(modlist)), FUN = function(x){
-                              ## Get N used in model
-                              mod.n <- ifelse(test %in% c('rbans', 'trailb'),
-                                              modlist[[x]]$stats['n'],
-                                              nrow(modlist[[x]]$analyses[[1]]$model))
+                            lapply(grep(paste0('\\.', test, '\\.[no]*wt\\.[0-9]+$'),
+                                        names(modlist),
+                                        value = TRUE),
+                                   FUN = function(x){
+                                     ## Get N used in model
+                                     mod.n <- ifelse(test %in% c('rbans', 'trailb'),
+                                                     modlist[[x]]$stats['n'],
+                                                     nrow(modlist[[x]]$analyses[[1]]$model))
 
-                              ## Which biomarker variable are we using?
-                              which.biovar <-
-                                grep(paste0('^', marker, '[a-z.]+$'),
-                                     unlist(strsplit(grep(marker,
-                                                          names(pool(modlist[[x]])$qbar),
-                                                          value = TRUE),
-                                                     ')')),
-                                     value = TRUE)
+                                     ## Which biomarker variable are we using?
+                                     which.biovar <-
+                                       grep(paste0('^', marker, '[a-z.]+$'),
+                                            unlist(strsplit(grep(marker,
+                                                                 names(pool(modlist[[x]])$qbar),
+                                                                 value = TRUE),
+                                                            ')')),
+                                            value = TRUE)
 
-                              ## Get reference and comparison values
-                              ref.val <- dd$limits['Low:effect', which.biovar]
-                              comp.val <- dd$limits['High:effect', which.biovar]
+                                     ## Get reference and comparison values
+                                     ref.val <- dd$limits['Low:effect', which.biovar]
+                                     comp.val <- dd$limits['High:effect', which.biovar]
 
-                              ## Get coefficients, vcov matrix to use to calculate RR/CI
-                              mod.coef <- pool(modlist[[x]])$qbar
-                              mod.vcov <- pool(modlist[[x]])$t
+                                     ## Get coefficients, vcov matrix to use to calculate RR/CI
+                                     mod.coef <- pool(modlist[[x]])$qbar
+                                     mod.vcov <- pool(modlist[[x]])$t
 
-                              ## Get knots to use for nonlinear terms
-                              bio.knots <-
-                                eval(parse(text = paste0('rcspline.eval(',
-                                                         as.character(modlist[[x]]$call1[2]), '$',
-                                                         which.biovar,
-                                                         ', nk = 3, knots.only = TRUE)')))
+                                     ## Get knots to use for nonlinear terms
+                                     bio.knots <-
+                                       eval(parse(text = paste0('rcspline.eval(',
+                                                                as.character(modlist[[x]]$call1[2]),
+                                                                '$',
+                                                                which.biovar,
+                                                                ', nk = 3, knots.only = TRUE)')))
                               bio.knot.list <- list(bio.knots)
-                              names(bio.knot.list) <- paste0('count_', which.biovar)
+                              # names(bio.knot.list) <- paste0('count_', which.biovar)
+                              names(bio.knot.list) <- which.biovar
 
                               mod.peci <-
                                 calc.ratioci(modcoefs = mod.coef,
                                              modvcov = mod.vcov,
-                                             ratiovar = paste0('count_', which.biovar),
+                                             # ratiovar = paste0('count_', which.biovar),
+                                             ratiovar = which.biovar,
                                              ratiovals = c(ref.val, comp.val),
                                              use.knots = bio.knot.list)
 
