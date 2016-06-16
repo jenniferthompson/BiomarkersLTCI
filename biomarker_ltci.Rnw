@@ -2643,12 +2643,15 @@ dd <- datadist(model.data); options(datadist = 'dd')
 
 ## -- Function to calculate ratio, CI for a logit model (eg, negative binomial), using manual ------
 ## -- variables for nonlinear and interaction terms ------------------------------------------------
-calc.ratioci.inflltci <- function(marker,
-                                  modlist,
-                                  modobj,
-                                  marker.adjust = NULL,
-                                  markerp.adjust = NULL,
-                                  alpha = 0.05){
+calc.ratioci.inflltci <- function(marker,                  ## string, eg 'crp'
+                                  modlist,                 ## list of model fits
+                                  modobj,                  ## model object
+                                  marker.adjust = NULL,    ## Adjustment values for main term;
+                                                           ## default = 75th vs 25th percentile
+                                  markerp.adjust = NULL,   ## Adjustment values for nonlinear term
+                                  cohort.specific = FALSE, ## For defaults, use only patients with
+                                                           ##  fxnal outcomes at spec time point?
+                                  alpha = 0.05){           ## % CIs
   
   if(!(modobj %in% names(modlist))){
     stop('modobj is not an element of modlist')
@@ -2663,8 +2666,13 @@ calc.ratioci.inflltci <- function(marker,
     stop('modobj name appears to be incorrect')
   }
   
-  ## Data set to use: all patients in cohort at specific time point
-  usedata <- model.data[model.data[,paste0('func.cohort.', time)],]
+  ## Data set to use: if cohort.specific = T, all patients in cohort *at specific time point*;
+  ##  otw, all patients in original cohort
+  if(cohort.specific){
+    usedata <- model.data[model.data[,paste0('func.cohort.', time)],]
+  } else{
+    usedata <- model.data
+  }
 
   ## Get name of X variable  
   xvar <- paste0(marker, '.', modinfo['measure'])
@@ -2726,12 +2734,9 @@ calc.ratioci.inflltci <- function(marker,
   ratiovar.lcl <- exp(ratiovar.logor - qnorm(critval)*ratiovar.se)
   ratiovar.ucl <- exp(ratiovar.logor + qnorm(critval)*ratiovar.se)
   
-  return(c('pointest' = ratiovar.or, 'lcl' = ratiovar.lcl, 'ucl' = ratiovar.ucl))
+  return(c('pointest' = ratiovar.or, 'lcl' = ratiovar.lcl, 'ucl' = ratiovar.ucl,
+           'ref.val' = marker.adjust[1], 'comp.val' = marker.adjust[2]))
 }
-
-#### TOMORROW: TEST THIS FUNCTION THOROUGHLY
-
-
 
 ## -- Function to create results table ------------------------------------------------------------
 create.results.table <- function(modlist, ## List of model objects (eg, crp.mods)
@@ -2750,19 +2755,19 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                                         names(modlist),
                                         value = TRUE),
                                    FUN = function(x){
-                              mod.n <- ifelse(test %in% c('rbans', 'trailb'),
-                                              modlist[[x]]$stats['n'],
-                                              nrow(modlist[[x]]$analyses[[1]]$model))
-                              take.row.sum <- grep(marker, rownames(summary(modlist[[x]])))
-                              take.row.anova <- grep(marker, rownames(anova(modlist[[x]])))
-                              c(names(modlist)[x],
-                                mod.n,
-                                summary(modlist[[x]])[take.row.sum,
-                                                      c('Low', 'High', 'Effect',
-                                                        'Lower 0.95', 'Upper 0.95')],
-                                anova(modlist[[x]])[take.row.anova, 'P'])
-                            })))
-
+                                     mod.n <- ifelse(test %in% c('rbans', 'trailb'),
+                                                     modlist[[x]]$stats['n'],
+                                                     nrow(modlist[[x]]$analyses[[1]]$model))
+                                     take.row.sum <- grep(marker, rownames(summary(modlist[[x]])))
+                                     take.row.anova <- grep(marker, rownames(anova(modlist[[x]])))
+                                     c(x,
+                                       mod.n,
+                                       summary(modlist[[x]])[take.row.sum,
+                                                             c('Low', 'High', 'Effect',
+                                                               'Lower 0.95', 'Upper 0.95')],
+                                       anova(modlist[[x]])[take.row.anova, 'P'])
+                                   })))
+    
   } else if(test %in% c('adl', 'faq')){
     results.data <-
       as.data.frame(do.call(rbind,
@@ -2774,52 +2779,21 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                                      mod.n <- ifelse(test %in% c('rbans', 'trailb'),
                                                      modlist[[x]]$stats['n'],
                                                      nrow(modlist[[x]]$analyses[[1]]$model))
-
-                                     ## Which biomarker variable are we using?
-                                     which.biovar <-
-                                       grep(paste0('^', marker, '[a-z.]+$'),
-                                            unlist(strsplit(grep(marker,
-                                                                 names(pool(modlist[[x]])$qbar),
-                                                                 value = TRUE),
-                                                            ')')),
-                                            value = TRUE)
-
-                                     ## Get reference and comparison values
-                                     ref.val <- dd$limits['Low:effect', which.biovar]
-                                     comp.val <- dd$limits['High:effect', which.biovar]
-
-                                     ## Get coefficients, vcov matrix to use to calculate RR/CI
-                                     mod.coef <- pool(modlist[[x]])$qbar
-                                     mod.vcov <- pool(modlist[[x]])$t
-
-                                     ## Get knots to use for nonlinear terms
-                                     bio.knots <-
-                                       eval(parse(text = paste0('rcspline.eval(',
-                                                                as.character(modlist[[x]]$call1[2]),
-                                                                '$',
-                                                                which.biovar,
-                                                                ', nk = 3, knots.only = TRUE)')))
-                              bio.knot.list <- list(bio.knots)
-                              # names(bio.knot.list) <- paste0('count_', which.biovar)
-                              names(bio.knot.list) <- which.biovar
-
-                              mod.peci <-
-                                calc.ratioci(modcoefs = mod.coef,
-                                             modvcov = mod.vcov,
-                                             # ratiovar = paste0('count_', which.biovar),
-                                             ratiovar = which.biovar,
-                                             ratiovals = c(ref.val, comp.val),
-                                             use.knots = bio.knot.list)
-
-                              c(names(modlist)[x],
-                                mod.n,
-                                ref.val,
-                                comp.val,
-                                mod.peci['pointest'],
-                                mod.peci['lcl'],
-                                mod.peci['ucl'],
-                                pval.list[[paste0('p.', names(modlist)[x])]])
-                            })))
+                                     
+                                     mod.peci <-
+                                       calc.ratioci.inflltci(marker = marker,
+                                                             modlist = modlist,
+                                                             modobj = x)
+                                     
+                                     c(x,
+                                       mod.n,
+                                       mod.peci['ref.val'],
+                                       mod.peci['comp.val'],
+                                       mod.peci['pointest'],
+                                       mod.peci['lcl'],
+                                       mod.peci['ucl'],
+                                       pval.list[[paste0('p.', x)]])
+                                   })))
   }
 
   ## Set names of resulting data frame; make all variables numeric except model name
@@ -2865,7 +2839,7 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                   'n.12', 'nowt.12', 'wt.12')]
 }
 
-## -- Get all results for linear models ------------------------------------------------------------
+## -- Get tables for all model results -------------------------------------------------------------
 ## Without delirium
 crp.rbans.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'rbans')
 crp.trailb.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'trailb')
