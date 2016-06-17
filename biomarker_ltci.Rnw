@@ -36,7 +36,7 @@ library(tidyr)
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'all'
+rerun.analyses <- 'none'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -2849,11 +2849,13 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
     spread(key = mod.type, value = results.str) %>%
     left_join(dplyr::select(n.data, measure.str, n.3, n.12), by = 'measure.str') %>%
     left_join(dplyr::select(pnl.data, measure.str, pnl.3, pnl.12), by = 'measure.str') %>%
-    mutate(pnl.3 = formatp(pnl.3), pnl.12 = formatp(pnl.12))
+    mutate(pnl.3 = formatp(pnl.3), pnl.12 = formatp(pnl.12),
+           n.pnl.3 = paste(n.3, pnl.3, sep = '; '),
+           n.pnl.12 = paste(n.12, pnl.12, sep = '; '))
 
   results.data[,c('measure.str', 'low', 'high',
-                  'n.3', 'pnl.3', 'nowt.3', 'wt.3',
-                  'n.12', 'pnl.12', 'nowt.12', 'wt.12')]
+                  'n.pnl.3', 'nowt.3', 'wt.3',
+                  'n.pnl.12', 'nowt.12', 'wt.12')]
 }
 
 ## -- Get tables for all model results -------------------------------------------------------------
@@ -3005,16 +3007,17 @@ tnfr1.del.faq.results <- create.results.table(modlist = tnfr1.del.mods, marker =
 ## -- Function to print results tables in Latex ----------------------------------------------------
 latex.results <- function(resultsdata, markerstr, teststr){
   latex(resultsdata, file = '',
-        colheads = c('', 'Ref.', 'Comp.', rep(c('N', 'No Weights', 'Weights'), 2)),
-        n.cgroup = c(1, 1, 1, 4, 4),
+        colheads = c('', 'Ref.', 'Comp.', rep(c('N; P, NL', 'No Weights', 'Weights'), 2)),
+        n.cgroup = c(1, 1, 1, 3, 3),
         cgroup = c('', '', '', '3-Month Scores', '12-Month Scores'),
         col.just = c('l', rep('r', ncol(resultsdata) - 1)),
         rowname = NULL,
         title = '',
         where = '!h',
-        size = 'small',
+        size = 'footnotesize',
         label = paste0('table:', tolower(markerstr), tolower(teststr)),
-        caption = paste(markerstr, 'vs', teststr))
+        caption = paste(markerstr, 'vs', teststr),
+        insert.bottom = '"P, NL": P-value for nonlinearity. If P \\textgreater 0.20, nonlinear terms were removed from the model for parsimony.')
 }
 
 # ## Spot check a few models
