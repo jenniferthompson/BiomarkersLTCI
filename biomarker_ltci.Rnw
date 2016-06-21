@@ -423,6 +423,8 @@ Table \ref{table:consort} describes our study cohort at time points of major int
 
 For each biomarker, we present histograms of all individual measurements (all study days combined), as well as mean, first, and percent change per patient. We also present the number of study days each patient had that biomarker measured (per protocol, markers should have been drawn on days 1, 3, and 5, assuming the patient was still alive, in the study and in the ICU). The reference lines on each histogram represent the lower limit of detection for that biomarker. Any patient with a biomarker value below this limit per our assay had a value imputed using a uniform distribution between 0 and the lower limit.
 
+We also present boxplots of each biomarker by study day, again with reference lines for the limit of detection.
+
 \end{landscape}
 <<ptprogress>>=
 ## -- Create patient progress table (CONSORT info) -------------------------------------------------
@@ -754,11 +756,13 @@ latex(summaryM(admit.dx ~ cohort, data = desc.data.all),
 ## -- Generate plots of descriptive statistics for each biomarker ----------------------------------
 ## Create data set of raw biomarker variables for a) all enrolled patients with biomarker,
 ##  b) all patients with biomarker + long-term outcomes
-bio.values <- all.daily[all.daily$had.all.biomarkers, biomarker.vnames]
+bio.values <- all.daily[all.daily$had.all.biomarkers, c('study.day', biomarker.vnames)]
 bio.values.longterm <-
   subset(all.daily,
          had.all.biomarkers &
-          id %in% subset(all.oneobs, cog.cohort.either | func.cohort.either)$id)[,biomarker.vnames]
+          id %in% subset(all.oneobs,
+                         cog.cohort.either | func.cohort.either)$id)[, c('study.day',
+                                                                         biomarker.vnames)]
 
 bio.values$cohort <- 1
 bio.values.longterm$cohort <- 2
@@ -955,6 +959,19 @@ mmp9.plots <- bio.plots('mmp9')
 proteinc.plots <- bio.plots('proteinc')
 tnfa.plots <- bio.plots('tnfa')
 tnfr1.plots <- bio.plots('tnfr1')
+
+## -- Boxplots of biomarker values by study day ----------------------------------------------------
+bio.values.long <- bio.values.cohorts %>%
+  filter(cohort == 'Enrolled + Biomarkers') %>%
+  gather(key = biomarker, value = markerval, crp.imp:tnfr1.imp) %>%
+  mutate(biomarker = toupper(gsub('\\.imp$', '', biomarker)))
+
+bio.box.day <- ggplot(data = bio.values.long, aes(x = factor(study.day), y = markerval)) +
+  geom_boxplot(fill = 'navy', colour = 'gray50') +
+  facet_wrap(~ biomarker, scales = 'free_y', ncol = 3) +
+  scale_x_discrete(labels = paste('ICU Day', c(1, 3, 5)), name = '') +
+  ylab('Biomarker Value') +
+  theme_bw()
 
 @
 
