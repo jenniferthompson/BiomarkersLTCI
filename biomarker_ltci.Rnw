@@ -36,7 +36,7 @@ library(tidyr)
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'none'
+rerun.analyses <- 'all'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -265,46 +265,58 @@ bio.summary.wide <- bio.summary.pt %>%
 ## 4. Weight = 1 / estimated probability
 
 ## Create data set for imputation and modeling data
-model.data <- subset(brainmind.oneobs,
-                     had.all.biomarkers,
-                     select = c(id, age.enroll, charlson.score, edu, iqcode.score.e, stroke.risk,
-                                mean.benz.cube, mean.op.cube, mean.prop.cube, mean.dex.cube,
-                                mean.hal.cube, adl.e, faq.e, frailty, icudays.sevseptic.s,
-                                mean.modsofa.icu, del.s.imp, coma.s.imp, vent.los.tot.s,
-                                cog.cohort.3, cog.cohort.12, func.cohort.3, func.cohort.12)) %>%
-  left_join(bio.summary.wide, by = 'id')
+model.data <- subset(
+  brainmind.oneobs,
+  had.all.biomarkers,
+  select = c(
+    id, age.enroll, sex.pp, charlson.score, edu, iqcode.score.e, stroke.risk,
+    mean.benz.cube, mean.op.cube, mean.prop.cube, mean.dex.cube, mean.hal.cube,
+    adl.e, faq.e, frailty, icudays.sevseptic.s, mean.modsofa.icu, del.s.imp,
+    coma.s.imp, vent.los.tot.s, cog.cohort.3, cog.cohort.12, func.cohort.3,
+    func.cohort.12
+  )
+) %>%
+  left_join(bio.summary.wide, by = 'id') %>%
+  ## Numeric version of frailty at enrollment
+  mutate(frailty.num = as.numeric(frailty))
+
 dd <- datadist(model.data); options(datadist = 'dd')
 
 ## Create aregImpute object to use in weighting model
 set.seed(1)
-areg.weight <- aregImpute(~ age.enroll + charlson.score + I(edu) + I(iqcode.score.e) +
-                            stroke.risk + mean.benz.cube + mean.op.cube + mean.prop.cube +
-                            I(mean.dex.cube) + I(mean.hal.cube) + icudays.sevseptic.s + del.s.imp +
-                            coma.s.imp + mean.modsofa.icu + crp.mean.t + ifngamma.mean.t +
-                            il10.mean.t + il12.mean.t + il1b.mean.t + il6.mean.t + il8.mean.t +
-                            mmp9.mean.t + proteinc.mean.t + tnfa.mean.t + tnfr1.mean.t,
-                          n.impute = 10,
-                          nk = 3,
-                          data = model.data)
+areg.weight <- aregImpute(
+  ~ age.enroll + charlson.score + I(edu) + I(iqcode.score.e) + I(frailty.num) +
+    stroke.risk + mean.benz.cube + mean.op.cube + mean.prop.cube +
+    I(mean.dex.cube) + I(mean.hal.cube) + icudays.sevseptic.s + del.s.imp +
+    coma.s.imp + mean.modsofa.icu + crp.mean.t + ifngamma.mean.t + il10.mean.t +
+    il12.mean.t + il1b.mean.t + il6.mean.t + il8.mean.t + mmp9.mean.t +
+    proteinc.mean.t + tnfa.mean.t + tnfr1.mean.t,
+  n.impute = 10,
+  nk = 3,
+  data = model.data
+)
 
 ## Function to model P(being in cohort) using imputation
 prob.cohort <- function(cohort.var){
-  wtmod <- fit.mult.impute(formula = as.formula(paste(cohort.var,
-                             "rcs(age.enroll, 3) + rcs(charlson.score, 3) + edu +
-                              iqcode.score.e + rcs(stroke.risk, 3) +
-                              rcs(mean.benz.cube, 3) + rcs(mean.op.cube, 3) +
-                              rcs(mean.prop.cube, 3) + mean.dex.cube + mean.hal.cube +
-                              rcs(icudays.sevseptic.s, 3) + rcs(del.s.imp, 3) +
-                              rcs(coma.s.imp, 3) + rcs(mean.modsofa.icu, 3) +
-                              rcs(crp.mean.t, 3) + rcs(ifngamma.mean.t, 3) +
-                              rcs(il10.mean.t, 3) + rcs(il12.mean.t, 3) + rcs(il1b.mean.t, 3) +
-                              rcs(il6.mean.t, 3) + il8.mean.t + rcs(mmp9.mean.t, 3) +
-                              rcs(proteinc.mean.t, 3) + rcs(tnfa.mean.t, 3) +
-                              rcs(tnfr1.mean.t, 3)",
-                            sep = ' ~ ')),
-                            fitter = lrm,
-                            xtrans = areg.weight,
-                            data = model.data)
+  wtmod <- fit.mult.impute(
+    formula = as.formula(
+      paste(
+        cohort.var,
+        "rcs(age.enroll, 3) + rcs(charlson.score, 3) + edu + frailty.num +
+         iqcode.score.e + rcs(stroke.risk, 3) + rcs(mean.benz.cube, 3) +
+         rcs(mean.op.cube, 3) + rcs(mean.prop.cube, 3) + mean.dex.cube +
+         mean.hal.cube + rcs(icudays.sevseptic.s, 3) + rcs(del.s.imp, 3) +
+         rcs(coma.s.imp, 3) + rcs(mean.modsofa.icu, 3) + rcs(crp.mean.t, 3) +
+         rcs(ifngamma.mean.t, 3) + rcs(il10.mean.t, 3) + rcs(il12.mean.t, 3) +
+         rcs(il1b.mean.t, 3) + rcs(il6.mean.t, 3) + il8.mean.t +
+         rcs(mmp9.mean.t, 3) + rcs(proteinc.mean.t, 3) + rcs(tnfa.mean.t, 3) +
+         rcs(tnfr1.mean.t, 3)",
+        sep = ' ~ '
+      )
+    ),
+    fitter = lrm,
+    xtrans = areg.weight,
+    data = model.data)
   predict(wtmod, type = 'fitted')
 }
 
@@ -326,19 +338,26 @@ model.data$wt.func.12 <- 1 / prob.func.12
 # sum(subset(model.data, func.cohort.12)$wt.func.12)
 
 # ## Check using plots
-# ggplot(aes(x = cog.cohort.12, y = prob.cog.12), data = model.data) + geom_boxplot() + scale_y_continuous(limits = 0:1)
+# ggplot(data = model.data) +
+#   aes(x = cog.cohort.12, y = prob.cog.12) +
+#   geom_boxplot() +
+#   scale_y_continuous(limits = 0:1)
 
-## -- Create data set with all covariates, test scores, weights -----------------------------------
+## -- Create data set with all covariates, test scores, weights ----------------
 ## Transpose followup scores
 model.fu.data <- brainmind.fu %>%
   filter(fu.period %in% c('3 Month', '12 Month')) %>%
-  ## Create rounded version of FAQ score - negative binomial model can't handle non-integers
-  ##  created by imputing missing questions
-  mutate(faq.rdscore = round(faq.totscore)) %>%
+  mutate(
+    ## Create rounded version of FAQ score - negative binomial model can't
+    ##  handle non-integers created by imputing missing questions
+    faq.rdscore = round(faq.totscore),
+    ## Create numeric version of frailty
+    frailty.fu = as.numeric(substr(frailty.fu, 1, 1))
+  ) %>%
   dplyr::select(id, fu.period, rbans.global.score, trail.b.tscore, adl.totscore,
-                faq.totscore, faq.rdscore) %>%
+                faq.totscore, faq.rdscore, frailty.fu) %>%
   separate(fu.period, into = c('month', 'text'), sep = ' ') %>%
-  gather(key = 'test', value = 'score', rbans.global.score:faq.rdscore) %>%
+  gather(key = 'test', value = 'score', rbans.global.score:frailty.fu) %>%
   mutate(test.month = paste(test, month, sep = '.')) %>%
   dplyr::select(-month, -text, -test) %>%
   spread(key = test.month, value = score)
@@ -408,6 +427,8 @@ label(model.data$rbans.global.score.3) <- 'RBANS global score, 3m'
 label(model.data$rbans.global.score.12) <- 'RBANS global score, 12m'
 label(model.data$trail.b.tscore.3) <- 'Trails B T-score, 3m'
 label(model.data$trail.b.tscore.12) <- 'Trails B T-score, 12m'
+label(model.data$frailty.fu.3) <- 'Clinical frailty score, 3m'
+label(model.data$frailty.fu.12) <- 'Clinical frailty score, 12m'
 
 @
 
@@ -671,21 +692,24 @@ latex(consort.df[,c('rowlab', 'npct')], file = '', title = '',
 <<desctables>>=
 desc.data <- brainmind.oneobs %>% left_join(model.fu.data, by = 'id')
 
-desc.vars <- c('age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqcode.score.e',
-               'stroke.risk', 'adl.e', 'faq.e', 'frailty', 'icu.type', 'num.apache', 'sofa',
-               'mean.benz.icu', 'mean.op.icu', 'mean.prop.icu', 'mean.dex.icu',
-               'mean.hal.icu', 'ever.vent.s', 'vent.los.tot.eo', 'ever.del.s.imp',
-               'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo',
-               'rbans.global.score.3', 'rbans.global.score.12', 'trail.b.tscore.3',
-               'trail.b.tscore.12', 'adl.totscore.3', 'adl.totscore.12', 'faq.totscore.3',
-               'faq.totscore.12')
+desc.vars <- c(
+  'age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqcode.score.e',
+  'stroke.risk', 'adl.e', 'faq.e', 'frailty', 'icu.type', 'num.apache', 'sofa',
+  'mean.benz.icu', 'mean.op.icu', 'mean.prop.icu', 'mean.dex.icu',
+  'mean.hal.icu', 'ever.vent.s', 'vent.los.tot.eo', 'ever.del.s.imp',
+  'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo',
+  'rbans.global.score.3', 'rbans.global.score.12', 'trail.b.tscore.3',
+  'trail.b.tscore.12', 'adl.totscore.3', 'adl.totscore.12', 'faq.totscore.3',
+  'faq.totscore.12', 'frailty.fu.3', 'frailty.fu.12'
+)
 
 desc.data.all <-
   desc.data[desc.data$id %in%
               subset(brainmind.oneobs,
                      had.all.biomarkers &
-                       !(studywd.amt %in% c('2. W/D from Participation and All Data Collected',
-                                            '4. N/A Study Staff Withdrew Patient')))$id,
+                       !(id == 14015 |
+                           studywd.amt %in% c('2. W/D from Participation and All Data Collected',
+                                              '4. N/A Study Staff Withdrew Patient')))$id,
             c('admit.dx', desc.vars)]
 desc.data.all$cohort <- 1
 desc.data.longterm <- desc.data[desc.data$cog.cohort.either | desc.data$func.cohort.either,
@@ -721,6 +745,8 @@ label(desc.data.all$adl.totscore.3) = 'Katz ADL score, 3m'
 label(desc.data.all$adl.totscore.12) = 'Katz ADL score, 12m'
 label(desc.data.all$faq.totscore.3) = 'FAQ score, 3m'
 label(desc.data.all$faq.totscore.12) = 'FAQ score, 12m'
+label(desc.data.all$frailty.fu.3) = 'Clinical frailty score, 3m'
+label(desc.data.all$frailty.fu.12) = 'Clinical frailty score, 12m'
 
 @
 
@@ -1073,11 +1099,10 @@ multiplot(plotlist = wthist.list, layout = matrix(1:4, ncol = 4, byrow = TRUE))
 @
 
 <<biomodels>>=
-
-## -- Create multiple imputation objects -----------------------------------------------------------
+## -- Create multiple imputation objects ---------------------------------------
 ## Create data sets with only patients in each cohort
-## Done differently for cognitive and functional outcomes, because mice uses entire data set whereas
-##  aregImpute does not
+## Done differently for cognitive and functional outcomes, because mice uses
+##  entire data set whereas aregImpute does not
 model.data.cog.3 <- subset(model.data, cog.cohort.3)
 model.data.cog.12 <- subset(model.data, cog.cohort.12)
 
@@ -1094,13 +1119,15 @@ model.data.pctchg.cog.12 <-
                       length(biomarker.vnames),]
 
 ## Create vector of variables to include in all imputations (covariates, outcome scores)
-always.use <- c('age.enroll', 'charlson.score', 'edu', 'iqcode.score.e', 'stroke.risk',
-                'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube', 'mean.dex.cube',
-                'mean.hal.cube', 'adl.e', 'faq.e', 'frailty', 'icudays.sevseptic.s',
-                'mean.modsofa.icu', 'del.s.imp', 'coma.s.imp', 'vent.los.tot.s',
-                'adl.totscore.12', 'adl.totscore.3', 'faq.rdscore.12', 'faq.rdscore.3',
-                'rbans.global.score.12', 'rbans.global.score.3', 'trail.b.tscore.12',
-                'trail.b.tscore.3')
+always.use <- c(
+  'age.enroll', 'sex.pp', 'charlson.score', 'edu', 'iqcode.score.e', 'frailty.num',
+  'stroke.risk', 'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube',
+  'mean.dex.cube', 'mean.hal.cube', 'adl.e', 'faq.e', 'icudays.sevseptic.s',
+  'mean.modsofa.icu', 'del.s.imp', 'coma.s.imp', 'vent.los.tot.s',
+  'adl.totscore.12', 'adl.totscore.3', 'faq.rdscore.12', 'faq.rdscore.3',
+  'rbans.global.score.12', 'rbans.global.score.3', 'trail.b.tscore.12',
+  'trail.b.tscore.3', 'frailty.fu.3', 'frailty.fu.12'
+)
 
 ## Create data sets with only patients included in each time point cohort
 model.data.func.3 <- model.data[model.data$func.cohort.3,
@@ -1167,13 +1194,17 @@ if(rerun.imputed){
   create.areg.obj <- function(cohort.data, marker.measure){
     areg.formula <-
       as.formula(paste0('~ ',
-                        paste(c('age.enroll', 'charlson.score', 'edu', 'I(iqcode.score.e)',
-                                'stroke.risk', 'mean.benz.cube', 'mean.op.cube', 'mean.prop.cube',
-                                'I(mean.dex.cube)', 'I(mean.hal.cube)', 'icudays.sevseptic.s',
-                                'del.s.imp', 'as.numeric(frailty)', 'I(adl.e)', 'I(faq.e)',
+                        paste(c('age.enroll', 'sex.pp', 'charlson.score', 'edu',
+                                'I(iqcode.score.e)', 'stroke.risk',
+                                'mean.benz.cube', 'mean.op.cube',
+                                'mean.prop.cube', 'I(mean.dex.cube)',
+                                'I(mean.hal.cube)', 'icudays.sevseptic.s',
+                                'del.s.imp', 'frailty.num', 'I(adl.e)',
+                                'I(faq.e)',
                                 gsub('\\.imp$', paste0('.', marker.measure), biomarker.vnames),
                                 'rbans.global.score.3', 'rbans.global.score.12',
-                                'trail.b.tscore.3', 'trail.b.tscore.12'),
+                                'trail.b.tscore.3', 'trail.b.tscore.12',
+                                'frailty.fu.3', 'frailty.fu.12'),
                               collapse = ' + ')))
 
     set.seed(56)
@@ -1264,6 +1295,13 @@ covar.func.nobio <- gsub(' + markervar + markervar.p', '', covar.func, fixed = T
 ## Delirium included
 covar.del.func <- "age.enroll + charlson.score + edu + iqcode.score.e + mean.benz.cube + mean.op.cube + mean.prop.cube + mean.dex.cube + mean.hal.cube + adl.e + faq.e + del.s.imp + markervar + markervar.p"
 covar.del.func.nobio <- gsub(' + markervar + markervar.p', '', covar.del.func, fixed = TRUE)
+
+## Frailty
+## Delirium *not* included
+covar.cfs <- "rcs(age.enroll, 3) + sex.pp + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(frailty.num, 3) + rcs(markervar, 3)"
+
+## Delirium included
+covar.del.cfs <- "rcs(age.enroll, 3) + sex.pp + rcs(charlson.score, 3) + rcs(edu, 3) + rcs(frailty.num, 3) + rcs(del.s.imp, 3) + rcs(markervar, 3)"
 
 ## For functional outcomes, fit models without biomarker terms to use for LR test
 ## ADL, mean/first
@@ -1357,7 +1395,8 @@ nobio.del.faq.pc.wt.12 <- with(mice.pctchg.12,
 make.modform <- function(outcome,
                          markervar,
                          covarstring = c('covar.cog', 'covar.del.cog',
-                                         'covar.func', 'covar.del.func')){
+                                         'covar.func', 'covar.del.func',
+                                         'covar.cfs', 'covar.del.cfs')){
   paste(outcome, gsub('markervar', markervar, covarstring, fixed = TRUE), sep = ' ~ ')
 }
 
@@ -1365,12 +1404,14 @@ make.modform <- function(outcome,
 ## marker: string representing prefix for biomarker variable (eg, "crp")
 ## cog.covar: string representing righthand side of model spec for cognitive outcomes
 ## func.covar: string representing righthand side of model spec for functional outcomes
-   ## both the above should include "markervar" for gsubbing actual biomarker variable names
+## cfs.covar: string representing righthand side of model spec for frailty outcome
+   ## all the above should include "markervar" for gsubbing actual biomarker variable names
 ## pcutoff: cutoff to determine whether to keep or discard nonlinear terms from each model
 ## use.method: Wald or likelihood; testing method for pool.compare()
 run.marker.mods <- function(marker,
                             cog.covar = covar.cog,
                             func.covar = covar.func,
+                            cfs.covar = covar.cfs,
                             pcutoff = 0.2,
                             use.method = c('likelihood', 'Wald')){
   use.method <- match.arg(use.method)
@@ -1378,6 +1419,7 @@ run.marker.mods <- function(marker,
   ## Create formulas using only linear terms
   cog.covar.lin <- gsub('rcs\\(', '', gsub(', [0-9]+\\)', '', cog.covar))
   func.covar.lin <- gsub(' + markervar.p', '', func.covar, fixed = TRUE)
+  cfs.covar.lin <- gsub('rcs\\(', '', gsub(', [0-9]+\\)', '', cfs.covar))
   
   ## Create character string representing biomarker variable (+ transformation, if needed) to
   ## include in model formulas
@@ -1865,6 +1907,133 @@ run.marker.mods <- function(marker,
     eval(parse(text = sprintf("with(mice.pctchg.12, glm.nb(formula = %s, weights = wt.func.12))",
                               pctchg.faq12.form)))
 
+  ## CSHA clinical frailty score ##
+  ## Mean vs. CFS
+  mean.cfs3.form <-
+    as.formula(make.modform('frailty.fu.3', transmarker.mean, cfs.covar))
+  mean.cfs.nowt.3 <-
+    fit.mult.impute(mean.cfs3.form,
+                    fitter = ols, xtrans = mice.mean.3, data = model.data.func.3)
+  mean.cfs.3.pnl <- anova(mean.cfs.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(mean.cfs.3.pnl > pcutoff){
+    mean.cfs3.form <-
+      as.formula(make.modform('frailty.fu.3', transmarker.mean, cfs.covar.lin))
+    mean.cfs.nowt.3 <-
+      fit.mult.impute(mean.cfs3.form,
+                      fitter = ols, xtrans = mice.mean.3, data = model.data.func.3)
+  }
+  
+  mean.cfs.wt.3 <-
+    fit.mult.impute(mean.cfs3.form,
+                    fitter = ols.fix, xtrans = mice.mean.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  mean.cfs12.form <-
+    as.formula(make.modform('frailty.fu.12', transmarker.mean, cfs.covar))
+  mean.cfs.nowt.12 <-
+    fit.mult.impute(mean.cfs12.form,
+                    fitter = ols, xtrans = mice.mean.12, data = model.data.func.12)
+  
+  mean.cfs.12.pnl <- anova(mean.cfs.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(mean.cfs.12.pnl > pcutoff){
+    mean.cfs12.form <-
+      as.formula(make.modform('frailty.fu.12', transmarker.mean, cfs.covar.lin))
+    mean.cfs.nowt.3 <-
+      fit.mult.impute(mean.cfs12.form,
+                      fitter = ols, xtrans = mice.mean.12, data = model.data.func.12)
+  }
+  
+  mean.cfs.wt.12 <-
+    fit.mult.impute(mean.cfs12.form,
+                    fitter = ols.fix, xtrans = mice.mean.12, weights = wt.func.12,
+                    data = model.data.func.12)
+
+  ## First vs. CFS
+  first.cfs3.form <-
+    as.formula(make.modform('frailty.fu.3', transmarker.first, cfs.covar))
+  first.cfs.nowt.3 <-
+    fit.mult.impute(first.cfs3.form,
+                    fitter = ols, xtrans = mice.first.3, data = model.data.func.3)
+
+  first.cfs.3.pnl <- anova(first.cfs.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(first.cfs.3.pnl > pcutoff){
+    first.cfs3.form <-
+      as.formula(make.modform('frailty.fu.3', transmarker.first, cfs.covar.lin))
+    first.cfs.nowt.3 <-
+      fit.mult.impute(first.cfs3.form,
+                      fitter = ols, xtrans = mice.first.3, data = model.data.func.3)
+  }
+    
+  first.cfs.wt.3 <-
+    fit.mult.impute(first.cfs3.form,
+                    fitter = ols.fix, xtrans = mice.first.3, weights = wt.func.3,
+                    data = model.data.func.3)
+
+  first.cfs12.form <-
+    as.formula(make.modform('frailty.fu.12', transmarker.first, cfs.covar))
+  first.cfs.nowt.12 <-
+    fit.mult.impute(first.cfs12.form,
+                    fitter = ols, xtrans = mice.first.12, data = model.data.func.12)
+
+  first.cfs.12.pnl <- anova(first.cfs.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(first.cfs.12.pnl > pcutoff){
+    first.cfs12.form <-
+      as.formula(make.modform('frailty.fu.12', transmarker.first, cfs.covar.lin))
+    first.cfs.nowt.12 <-
+      fit.mult.impute(first.cfs12.form,
+                      fitter = ols, xtrans = mice.first.12, data = model.data.func.12)
+  }
+    
+  first.cfs.wt.12 <-
+    fit.mult.impute(first.cfs12.form,
+                    fitter = ols.fix, xtrans = mice.first.12,
+                    weights = wt.func.12, data = model.data.func.12)
+
+  ## % change vs. CFS
+  pctchg.cfs3.form <-
+    as.formula(make.modform('frailty.fu.3', transmarker.pctchg, cfs.covar))
+  pctchg.cfs.nowt.3 <-
+    fit.mult.impute(pctchg.cfs3.form, fitter = ols, xtrans = mice.pctchg.3,
+                    data = model.data.pctchg.func.3)
+
+  pctchg.cfs.3.pnl <- anova(pctchg.cfs.nowt.3)['TOTAL NONLINEAR', 'P']
+  
+  if(pctchg.cfs.3.pnl > pcutoff){
+    pctchg.cfs3.form <-
+      as.formula(make.modform('frailty.fu.3', transmarker.pctchg, cfs.covar.lin))
+    pctchg.cfs.nowt.3 <-
+      fit.mult.impute(pctchg.cfs3.form,
+                      fitter = ols, xtrans = mice.pctchg.3, data = model.data.func.3)
+  }
+    
+  pctchg.cfs.wt.3 <-
+    fit.mult.impute(pctchg.cfs3.form, fitter = ols.fix, xtrans = mice.pctchg.3,
+                    weights = wt.func.3, data = model.data.pctchg.func.3)
+
+  pctchg.cfs12.form <-
+    as.formula(make.modform('frailty.fu.12', transmarker.pctchg, cfs.covar))
+  pctchg.cfs.nowt.12 <-
+    fit.mult.impute(pctchg.cfs12.form, fitter = ols, xtrans = mice.pctchg.12,
+                    data = model.data.pctchg.func.12)
+
+  pctchg.cfs.12.pnl <- anova(pctchg.cfs.nowt.12)['TOTAL NONLINEAR', 'P']
+  
+  if(pctchg.cfs.12.pnl > pcutoff){
+    pctchg.cfs12.form <-
+      as.formula(make.modform('frailty.fu.12', transmarker.pctchg, cfs.covar.lin))
+    pctchg.cfs.nowt.12 <-
+      fit.mult.impute(pctchg.cfs12.form,
+                      fitter = ols, xtrans = mice.pctchg.12, data = model.data.func.12)
+  }
+    
+  pctchg.cfs.wt.12 <-
+    fit.mult.impute(pctchg.cfs12.form, fitter = ols.fix, xtrans = mice.pctchg.12,
+                    weights = wt.func.12, data = model.data.pctchg.func.12)
+
   return(list('mean.rbans.nowt.3' = mean.rbans.nowt.3,
               'mean.rbans.wt.3' = mean.rbans.wt.3,
               'mean.rbans.nowt.12' = mean.rbans.nowt.12,
@@ -1913,6 +2082,18 @@ run.marker.mods <- function(marker,
               'pctchg.faq.wt.3' = pctchg.faq.wt.3,
               'pctchg.faq.nowt.12' = pctchg.faq.nowt.12,
               'pctchg.faq.wt.12' = pctchg.faq.wt.12,
+              'mean.cfs.nowt.3' = mean.cfs.nowt.3,
+              'mean.cfs.wt.3' = mean.cfs.wt.3,
+              'mean.cfs.nowt.12' = mean.cfs.nowt.12,
+              'mean.cfs.wt.12' = mean.cfs.wt.12,
+              'first.cfs.nowt.3' = first.cfs.nowt.3,
+              'first.cfs.wt.3' = first.cfs.wt.3,
+              'first.cfs.nowt.12' = first.cfs.nowt.12,
+              'first.cfs.wt.12' = first.cfs.wt.12,
+              'pctchg.cfs.nowt.3' = pctchg.cfs.nowt.3,
+              'pctchg.cfs.wt.3' = pctchg.cfs.wt.3,
+              'pctchg.cfs.nowt.12' = pctchg.cfs.nowt.12,
+              'pctchg.cfs.wt.12' = pctchg.cfs.wt.12,
               'mean.rbans.3.pnl' = mean.rbans.3.pnl,
               'mean.rbans.12.pnl' = mean.rbans.12.pnl,
               'first.rbans.3.pnl' = first.rbans.3.pnl,
@@ -1936,7 +2117,13 @@ run.marker.mods <- function(marker,
               'first.faq.3.pnl' = first.faq.3.pnl,
               'first.faq.12.pnl' = first.faq.12.pnl,
               'pctchg.faq.3.pnl' = pctchg.faq.3.pnl,
-              'pctchg.faq.12.pnl' = pctchg.faq.12.pnl))
+              'pctchg.faq.12.pnl' = pctchg.faq.12.pnl,
+              'mean.cfs.3.pnl' = mean.cfs.3.pnl,
+              'mean.cfs.12.pnl' = mean.cfs.12.pnl,
+              'first.cfs.3.pnl' = first.cfs.3.pnl,
+              'first.cfs.12.pnl' = first.cfs.12.pnl,
+              'pctchg.cfs.3.pnl' = pctchg.cfs.3.pnl,
+              'pctchg.cfs.12.pnl' = pctchg.cfs.12.pnl))
 }
 
 ## -- If requested, rerun models; otherwise, load saved objects ------------------------------------
@@ -1954,41 +2141,51 @@ if(rerun.models){
   tnfa.mods <- run.marker.mods('tnfa')
   tnfr1.mods <- run.marker.mods('tnfr1')
 
-
   ## Models with delirium
   crp.del.mods <- run.marker.mods('crp',
                                   cog.covar = covar.del.cog,
-                                  func.covar = covar.del.func)
+                                  func.covar = covar.del.func,
+                                  cfs.covar = covar.del.cfs)
   ifngamma.del.mods <- run.marker.mods('ifngamma',
                                        cog.covar = covar.del.cog,
-                                       func.covar = covar.del.func)
+                                       func.covar = covar.del.func,
+                                       cfs.covar = covar.del.cfs)
   il10.del.mods <- run.marker.mods('il10',
                                    cog.covar = covar.del.cog,
-                                   func.covar = covar.del.func)
+                                   func.covar = covar.del.func,
+                                   cfs.covar = covar.del.cfs)
   il12.del.mods <- run.marker.mods('il12',
                                    cog.covar = covar.del.cog,
-                                   func.covar = covar.del.func)
+                                   func.covar = covar.del.func,
+                                   cfs.covar = covar.del.cfs)
   il1b.del.mods <- run.marker.mods('il1b',
                                    cog.covar = covar.del.cog,
-                                   func.covar = covar.del.func)
+                                   func.covar = covar.del.func,
+                                   cfs.covar = covar.del.cfs)
   il6.del.mods <- run.marker.mods('il6',
                                   cog.covar = covar.del.cog,
-                                  func.covar = covar.del.func)
+                                  func.covar = covar.del.func,
+                                  cfs.covar = covar.del.cfs)
   il8.del.mods <- run.marker.mods('il8',
                                   cog.covar = covar.del.cog,
-                                  func.covar = covar.del.func)
+                                  func.covar = covar.del.func,
+                                  cfs.covar = covar.del.cfs)
   mmp9.del.mods <- run.marker.mods('mmp9',
                                    cog.covar = covar.del.cog,
-                                   func.covar = covar.del.func)
+                                   func.covar = covar.del.func,
+                                   cfs.covar = covar.del.cfs)
   proteinc.del.mods <- run.marker.mods('proteinc',
                                        cog.covar = covar.del.cog,
-                                       func.covar = covar.del.func)
+                                       func.covar = covar.del.func,
+                                       cfs.covar = covar.del.cfs)
   tnfa.del.mods <- run.marker.mods('tnfa',
                                    cog.covar = covar.del.cog,
-                                   func.covar = covar.del.func)
+                                   func.covar = covar.del.func,
+                                   cfs.covar = covar.del.cfs)
   tnfr1.del.mods <- run.marker.mods('tnfr1',
                                     cog.covar = covar.del.cog,
-                                    func.covar = covar.del.func)
+                                    func.covar = covar.del.func,
+                                    cfs.covar = covar.del.cfs)
 
   save(crp.mods, crp.del.mods,
        ifngamma.mods, ifngamma.del.mods,
@@ -2010,7 +2207,7 @@ if(rerun.models){
 # check.diag.linear <- function(mod.list, time = c(3, 12), out.name, out.str, title.str = NULL){
 #   ## If no title.str given, set to same as out.str
 #   if(is.null(title.str)){ title.str <- out.str }
-#
+# 
 #   par(mfrow = c(3, 4), cex = 0.5, cex.main = 0.8)
 #   ols.diagnostics(model.obj = mod.list[[match(paste0('mean.', out.name, '.nowt.', time),
 #                                               names(mod.list))]],
@@ -2038,139 +2235,95 @@ if(rerun.models){
 #                   title.string = paste0(time, 'M ', out.str, ' vs % Change, With Weights'))
 # }
 
-## -- Check diagnostics -----------------------------------------------------------------------------
+## -- Check diagnostics --------------------------------------------------------
 ## Without delirium
-# ## CRP
+## CRP
 # check.diag.linear(crp.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(crp.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(crp.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(crp.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## IFN-gamma
-# check.diag.linear(ifngamma.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(ifngamma.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(ifngamma.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(ifngamma.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## IL-10
-# check.diag.linear(il10.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il10.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il10.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(il10.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## IL-12
-# check.diag.linear(il12.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il12.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il12.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(il12.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## IL-1b
-# check.diag.linear(il1b.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il1b.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il1b.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(il1b.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## IL-6
-# check.diag.linear(il6.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il6.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il6.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(il6.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## IL-8
-# check.diag.linear(il8.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il8.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(il8.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(il8.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## MMP9
-# check.diag.linear(mmp9.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(mmp9.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(mmp9.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(mmp9.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## Protein C
-# check.diag.linear(proteinc.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(proteinc.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(proteinc.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(proteinc.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## TNF-alpha
-# check.diag.linear(tnfa.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(tnfa.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(tnfa.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(tnfa.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
-# ## TNFR1
-# check.diag.linear(tnfr1.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(tnfr1.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(tnfr1.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(tnfr1.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(crp.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(crp.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 
-# ## CRP
-# check.diag.linear(crp.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(crp.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
-# check.diag.linear(crp.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
-# check.diag.linear(crp.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
-#
 # ## IFN-gamma
 # check.diag.linear(ifngamma.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(ifngamma.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(ifngamma.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(ifngamma.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-10
 # check.diag.linear(il10.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il10.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il10.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il10.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-12
 # check.diag.linear(il12.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il12.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il12.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il12.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-1b
 # check.diag.linear(il1b.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il1b.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il1b.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il1b.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-6
 # check.diag.linear(il6.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il6.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il6.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il6.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-8
 # check.diag.linear(il8.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il8.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il8.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il8.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## MMP9
 # check.diag.linear(mmp9.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(mmp9.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(mmp9.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(mmp9.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## Protein C
 # check.diag.linear(proteinc.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(proteinc.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(proteinc.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(proteinc.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## TNF-alpha
 # check.diag.linear(tnfa.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfa.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfa.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(tnfa.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## TNFR1
 # check.diag.linear(tnfr1.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfr1.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfr1.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(tnfr1.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 
 ## With delirium
 # ## CRP
@@ -2178,66 +2331,88 @@ if(rerun.models){
 # check.diag.linear(crp.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(crp.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(crp.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(crp.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(crp.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IFN-gamma
 # check.diag.linear(ifngamma.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(ifngamma.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(ifngamma.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(ifngamma.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(ifngamma.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-10
 # check.diag.linear(il10.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il10.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il10.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il10.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il10.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-12
 # check.diag.linear(il12.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il12.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il12.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il12.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il12.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-1b
 # check.diag.linear(il1b.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il1b.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il1b.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il1b.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il1b.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-6
 # check.diag.linear(il6.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il6.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il6.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il6.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il6.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## IL-8
 # check.diag.linear(il8.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(il8.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(il8.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(il8.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(il8.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## MMP9
 # check.diag.linear(mmp9.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(mmp9.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(mmp9.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(mmp9.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(mmp9.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## Protein C
 # check.diag.linear(proteinc.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(proteinc.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(proteinc.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(proteinc.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(proteinc.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## TNF-alpha
 # check.diag.linear(tnfa.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfa.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfa.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfa.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(tnfa.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 #
 # ## TNFR1
 # check.diag.linear(tnfr1.del.mods, time = 3, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.del.mods, time = 12, out.name = 'rbans', out.str = 'RBANS')
 # check.diag.linear(tnfr1.del.mods, time = 3, out.name = 'trailb', out.str = 'Trails B')
 # check.diag.linear(tnfr1.del.mods, time = 12, out.name = 'trailb', out.str = 'Trails B')
+# check.diag.linear(tnfr1.del.mods, time = 3, out.name = 'cfs', out.str = 'CFS')
+# check.diag.linear(tnfr1.del.mods, time = 12, out.name = 'cfs', out.str = 'CFS')
 
 # ## -- Check assumptions for POLR models (ADL, FAQ) - unweighted versions only ----------------------
 # ## Function to check assumptions for all unweighted models for a given biomarker and test
@@ -2756,13 +2931,13 @@ calc.ratioci.inflltci <- function(marker,                  ## string, eg 'crp'
            'ref.val' = marker.adjust[1], 'comp.val' = marker.adjust[2]))
 }
 
-## -- Function to create results table ------------------------------------------------------------
+## -- Function to create results table -----------------------------------------
 create.results.table <- function(modlist, ## List of model objects (eg, crp.mods)
                                  marker,  ## string with marker prefix (eg, 'crp')
                                  test,    ## string indicating test of interest (eg, 'rbans')
                                  pval.list = NULL){ ## list of p-values for functional outcomes
 
-  if(test %in% c('rbans', 'trailb')){
+  if(test %in% c('rbans', 'trailb', 'cfs')){
     ## Create initial data frame with results from summary(), anova() for biomarker rows only
     ## For all models in model list with names containing "test",
     ##  take rows of summary() and anova() with rownames containing biomarker;
@@ -2773,7 +2948,7 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                                         names(modlist),
                                         value = TRUE),
                                    FUN = function(x){
-                                     mod.n <- ifelse(test %in% c('rbans', 'trailb'),
+                                     mod.n <- ifelse(test %in% c('rbans', 'trailb', 'cfs'),
                                                      modlist[[x]]$stats['n'],
                                                      nrow(modlist[[x]]$analyses[[1]]$model))
                                      mod.pnl <- modlist[[paste0(gsub('[no]*wt\\.', '', x), '.pnl')]]
@@ -2796,7 +2971,7 @@ create.results.table <- function(modlist, ## List of model objects (eg, crp.mods
                                         value = TRUE),
                                    FUN = function(x){
                                      ## Get N used in model
-                                     mod.n <- ifelse(test %in% c('rbans', 'trailb'),
+                                     mod.n <- ifelse(test %in% c('rbans', 'trailb', 'cfs'),
                                                      modlist[[x]]$stats['n'],
                                                      nrow(modlist[[x]]$analyses[[1]]$model))
                                      mod.pnl <- modlist[[paste0(gsub('[no]*wt\\.', '', x), '.pnl')]]
@@ -2883,6 +3058,7 @@ crp.adl.results <-
   create.results.table(modlist = crp.mods, marker = 'crp', 'adl', pval.list = crp.func.pvals)
 crp.faq.results <-
   create.results.table(modlist = crp.mods, marker = 'crp', 'faq', pval.list = crp.func.pvals)
+crp.cfs.results <- create.results.table(modlist = crp.mods, marker = 'crp', 'cfs')
 ifngamma.rbans.results <-
   create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'rbans')
 ifngamma.trailb.results <-
