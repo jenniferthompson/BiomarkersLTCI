@@ -23,7 +23,7 @@ opts_chunk$set(echo=FALSE, warning = FALSE, message = FALSE, cache = FALSE, erro
 options(replace.assign = TRUE, width = 90)
 
 library(mice)
-library(ClusterBootMultinom)
+# library(ClusterBootMultinom)
 library(MASS)
 library(pscl)
 library(rms)
@@ -147,36 +147,29 @@ biomarker.vnames <- paste0(c('crp', 'ifngamma', 'il10', 'il12', 'il1b', 'il6', '
 ## Load all BRAIN data
 if(Sys.info()['sysname'] == 'Darwin'){
   if(length(grep('Volumes', getwd())) > 0){
-    load('/Volumes/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
+    load('/Volumes/thomps23/ICUDelirium/BRAINMIND/CombineData/brainmind_deid.Rdata')
     source('/Volumes/thomps23/R/multiplot.r')
   } else{
-    load('braindata.Rdata')
+    load('brainmind_deid.Rdata')
     source('multiplot.r')
   }
 } else{
-  load('/home/thomps23/ICUDelirium/BRAINICU/braindata.Rdata')
+  load('/home/thomps23/ICUDelirium/BRAINMIND/CombineData/brainmind_deid.Rdata')
   source('/home/thomps23/R/multiplot.r')
 }
 
-## -- Insert data management to combine BRAIN, MIND data sets --------------------------------------
-
-## For now...
-all.oneobs <- brain.oneobs
-all.daily <- brain.daily
-all.fu <- brain.fu
-
 ## Create cube root versions of all mean 24h ICU drug variables
-all.oneobs$mean.benz.cube <- all.oneobs$mean.benz.icu^(1/3)
-all.oneobs$mean.op.cube <- all.oneobs$mean.op.new.icu^(1/3)
-all.oneobs$mean.prop.cube <- all.oneobs$mean.prop.icu^(1/3)
-all.oneobs$mean.dex.cube <- all.oneobs$mean.dex.icu^(1/3)
-all.oneobs$mean.hal.cube <- all.oneobs$mean.hal.icu^(1/3)
+brainmind.oneobs$mean.benz.cube <- brainmind.oneobs$mean.benz.icu^(1/3)
+brainmind.oneobs$mean.op.cube <- brainmind.oneobs$mean.op.icu^(1/3)
+brainmind.oneobs$mean.prop.cube <- brainmind.oneobs$mean.prop.icu^(1/3)
+brainmind.oneobs$mean.dex.cube <- brainmind.oneobs$mean.dex.icu^(1/3)
+brainmind.oneobs$mean.hal.cube <- brainmind.oneobs$mean.hal.icu^(1/3)
 
-label(all.oneobs$mean.benz.cube) <- 'Mean 24h benzos in ICU, cube root'
-label(all.oneobs$mean.op.cube) <- 'Mean 24h opioids in ICU, cube root'
-label(all.oneobs$mean.prop.cube) <- 'Mean 24h propofol in ICU, cube root'
-label(all.oneobs$mean.dex.cube) <- 'Mean 24h dex in ICU, cube root'
-label(all.oneobs$mean.hal.cube) <- 'Mean 24h haldol in ICU, cube root'
+label(brainmind.oneobs$mean.benz.cube) <- 'Mean 24h benzos in ICU, cube root'
+label(brainmind.oneobs$mean.op.cube) <- 'Mean 24h opioids in ICU, cube root'
+label(brainmind.oneobs$mean.prop.cube) <- 'Mean 24h propofol in ICU, cube root'
+label(brainmind.oneobs$mean.dex.cube) <- 'Mean 24h dex in ICU, cube root'
+label(brainmind.oneobs$mean.hal.cube) <- 'Mean 24h haldol in ICU, cube root'
 
 @
 
@@ -195,9 +188,9 @@ frailty).
 
 <<datamgmt>>=
 ## -- Indicator for whether patient has any biomarkers measured on any study day -------------------
-all.daily$had.all.biomarkers <-
-  rowSums(!is.na(all.daily[,biomarker.vnames])) == length(biomarker.vnames)
-all.oneobs$had.all.biomarkers <- all.oneobs$id %in% subset(all.daily, had.all.biomarkers)$id
+brainmind.daily$had.all.biomarkers <-
+  rowSums(!is.na(brainmind.daily[,biomarker.vnames])) == length(biomarker.vnames)
+brainmind.oneobs$had.all.biomarkers <- brainmind.oneobs$id %in% subset(brainmind.daily, had.all.biomarkers)$id
 
 ## -- Indicators for whether each patient is in cognitive or functional analysis cohort at ---------
 ## -- each time ------------------------------------------------------------------------------------
@@ -210,31 +203,31 @@ func.varnames <- c('bdi.totscore', 'pcl.totscore', 'adl.totscore', 'faq.totscore
                    'sf36.pcs', 'sf36.mcs', 'frailty.fu')
 
 ## Which patients/time points have at least partial cognitive or functional data?
-all.fu$has.cog.data <- rowSums(!is.na(all.fu[,cog.varnames])) > 0
-all.fu$has.func.data <- rowSums(!is.na(all.fu[,func.varnames])) > 0
+brainmind.fu$has.cog.data <- rowSums(!is.na(brainmind.fu[,cog.varnames])) > 0
+brainmind.fu$has.func.data <- rowSums(!is.na(brainmind.fu[,func.varnames])) > 0
 
 ## Indicators for complete vs. partial data
-all.fu$complete.cog <- ifelse(!all.fu$has.cog.data, NA,
-                              rowSums(!is.na(all.fu[,cog.varnames])) == length(cog.varnames))
-all.fu$complete.func <- ifelse(!all.fu$has.func.data, NA,
-                               rowSums(!is.na(all.fu[,func.varnames])) == length(func.varnames))
+brainmind.fu$complete.cog <- ifelse(!brainmind.fu$has.cog.data, NA,
+                              rowSums(!is.na(brainmind.fu[,cog.varnames])) == length(cog.varnames))
+brainmind.fu$complete.func <- ifelse(!brainmind.fu$has.func.data, NA,
+                               rowSums(!is.na(brainmind.fu[,func.varnames])) == length(func.varnames))
 
 ## Create indicators for whether patient is in cohort at each time
-all.oneobs$cog.cohort.3 <- all.oneobs$had.all.biomarkers &
-  all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.cog.data)$id
-all.oneobs$cog.cohort.12 <- all.oneobs$had.all.biomarkers &
-  all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.cog.data)$id
-all.oneobs$func.cohort.3 <- all.oneobs$had.all.biomarkers &
-  all.oneobs$id %in% subset(all.fu, fu.period == '3 Month' & has.func.data)$id
-all.oneobs$func.cohort.12 <- all.oneobs$had.all.biomarkers &
-  all.oneobs$id %in% subset(all.fu, fu.period == '12 Month' & has.func.data)$id
+brainmind.oneobs$cog.cohort.3 <- brainmind.oneobs$had.all.biomarkers &
+  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '3 Month' & has.cog.data)$id
+brainmind.oneobs$cog.cohort.12 <- brainmind.oneobs$had.all.biomarkers &
+  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '12 Month' & has.cog.data)$id
+brainmind.oneobs$func.cohort.3 <- brainmind.oneobs$had.all.biomarkers &
+  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '3 Month' & has.func.data)$id
+brainmind.oneobs$func.cohort.12 <- brainmind.oneobs$had.all.biomarkers &
+  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '12 Month' & has.func.data)$id
 
 ## Create indicators for whether patient is in each cohort at either time, for Table 1
-all.oneobs$cog.cohort.either <- all.oneobs$cog.cohort.3 | all.oneobs$cog.cohort.12
-all.oneobs$func.cohort.either <- all.oneobs$func.cohort.3 | all.oneobs$func.cohort.12
+brainmind.oneobs$cog.cohort.either <- brainmind.oneobs$cog.cohort.3 | brainmind.oneobs$cog.cohort.12
+brainmind.oneobs$func.cohort.either <- brainmind.oneobs$func.cohort.3 | brainmind.oneobs$func.cohort.12
 
 ## -- Calculate summary values for each biomarker for each patient --------------------------------
-bio.summary.pt <- all.daily[all.daily$had.all.biomarkers
+bio.summary.pt <- brainmind.daily[brainmind.daily$had.all.biomarkers
                             ,c('id', 'study.day', biomarker.vnames)] %>%
   gather(key = bio.marker, value = bio.value, crp.imp:tnfr1.imp) %>%
   filter(!is.na(bio.value)) %>%
@@ -272,7 +265,7 @@ bio.summary.wide <- bio.summary.pt %>%
 ## 4. Weight = 1 / estimated probability
 
 ## Create data set for imputation and modeling data
-model.data <- subset(all.oneobs,
+model.data <- subset(brainmind.oneobs,
                      had.all.biomarkers,
                      select = c(id, age.enroll, charlson.score, edu, iqcode.score.e, stroke.risk,
                                 mean.benz.cube, mean.op.cube, mean.prop.cube, mean.dex.cube,
@@ -337,7 +330,7 @@ model.data$wt.func.12 <- 1 / prob.func.12
 
 ## -- Create data set with all covariates, test scores, weights -----------------------------------
 ## Transpose followup scores
-model.fu.data <- all.fu %>%
+model.fu.data <- brainmind.fu %>%
   filter(fu.period %in% c('3 Month', '12 Month')) %>%
   ## Create rounded version of FAQ score - negative binomial model can't handle non-integers
   ##  created by imputing missing questions
@@ -431,29 +424,36 @@ We also present boxplots of each biomarker by study day, again with reference li
 ## Create status variables at hospital discharge, 3- and 12-month followup; death is prioritized
 ##   over withdrawal, and having followup data is prioritized over a status of Deceased (in that
 ##   case, assume status is a typo)
-all.oneobs$hosp.status <- with(all.oneobs, {
-  factor(ifelse(!is.na(studywd.amt) &
-                  studywd.amt %in% c('2. W/D from Participation and All Data Collected',
-                                     '4. N/A Study Staff Withdrew Patient'), 1,
-         ifelse(!is.na(died.inhosp) & died.inhosp == 'Died in hospital', 2,
-         ifelse(!is.na(studywd.amt) | !is.na(studywd.date), 3,
-         ifelse(!had.all.biomarkers, 4, 5)))),
-         levels = 1:5,
-         labels = c('Withdrew and requested data be destroyed',
-                    'Died in hospital',
-                    'Withdrew in hospital',
-                    'Survived hospital, but no days with all biomarkers',
-                    'Survived with >=1 day all biomarkers measured')) })
+fully_withdrew <- c(
+  '2. W/D from Participation and All Data Collected',
+  '4. N/A Study Staff Withdrew Patient'
+)
 
-all.oneobs$three.status.cog <- with(all.oneobs, {
+brainmind.oneobs$hosp.status <- with(brainmind.oneobs, {
+  factor(
+    ifelse(
+      (!is.na(studywd.amt) & studywd.amt %in% fully_withdrew) | id == 14015, 1,
+      ## 14015 had all data withdrawn, but not recorded in dates form)
+    ifelse(!is.na(died.inhosp) & died.inhosp == 'Died in hospital', 2,
+    ifelse(!is.na(studywd.amt) | id == 14015, 3,
+    ifelse(!had.all.biomarkers, 4, 5)))),
+    levels = 1:5,
+    labels = c('Withdrew and requested data be destroyed',
+               'Died in hospital',
+               'Withdrew in hospital',
+               'Survived hospital, but no days with all biomarkers',
+               'Survived with >=1 day all biomarkers measured')
+  ) })
+
+brainmind.oneobs$three.status.cog <- with(brainmind.oneobs, {
   factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
          ifelse(hosp.status == 'Died in hospital', 2,
          ifelse(hosp.status == 'Withdrew in hospital', 3,
          ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
-         ifelse(cog.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & complete.cog)$id, 9,
-         ifelse(cog.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & !complete.cog)$id, 8,
-         ifelse(id %in% subset(all.fu, fu.period == '3 Month' & status == 'Deceased')$id, 5,
-         ifelse(id %in% subset(all.fu,
+         ifelse(cog.cohort.3 & id %in% subset(brainmind.fu, fu.period == '3 Month' & complete.cog)$id, 9,
+         ifelse(cog.cohort.3 & id %in% subset(brainmind.fu, fu.period == '3 Month' & !complete.cog)$id, 8,
+         ifelse(id %in% subset(brainmind.fu, fu.period == '3 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(brainmind.fu,
                                fu.period == '3 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
@@ -470,17 +470,17 @@ all.oneobs$three.status.cog <- with(all.oneobs, {
                     'Partial cognitive data',
                     'Complete cognitive data')) })
 
-all.oneobs$three.status.func <- with(all.oneobs, {
+brainmind.oneobs$three.status.func <- with(brainmind.oneobs, {
   factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
          ifelse(hosp.status == 'Died in hospital', 2,
          ifelse(hosp.status == 'Withdrew in hospital', 3,
          ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
-         ifelse(func.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & complete.func)$id,
+         ifelse(func.cohort.3 & id %in% subset(brainmind.fu, fu.period == '3 Month' & complete.func)$id,
                 9,
-         ifelse(func.cohort.3 & id %in% subset(all.fu, fu.period == '3 Month' & !complete.func)$id,
+         ifelse(func.cohort.3 & id %in% subset(brainmind.fu, fu.period == '3 Month' & !complete.func)$id,
                 8,
-         ifelse(id %in% subset(all.fu, fu.period == '3 Month' & status == 'Deceased')$id, 5,
-         ifelse(id %in% subset(all.fu,
+         ifelse(id %in% subset(brainmind.fu, fu.period == '3 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(brainmind.fu,
                                fu.period == '3 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
@@ -497,19 +497,19 @@ all.oneobs$three.status.func <- with(all.oneobs, {
                     'Partial functional data',
                     'Complete functional data')) })
 
-all.oneobs$twelve.status.cog <- with(all.oneobs, {
+brainmind.oneobs$twelve.status.cog <- with(brainmind.oneobs, {
   factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
          ifelse(hosp.status == 'Died in hospital' |
                   three.status.cog == 'Died before 3-month followup', 2,
          ifelse(hosp.status == 'Withdrew in hospital' |
                   three.status.cog == 'Withdrew before 3-month followup', 3,
          ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
-         ifelse(cog.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & complete.cog)$id,
+         ifelse(cog.cohort.12 & id %in% subset(brainmind.fu, fu.period == '12 Month' & complete.cog)$id,
                 9,
-         ifelse(cog.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & !complete.cog)$id,
+         ifelse(cog.cohort.12 & id %in% subset(brainmind.fu, fu.period == '12 Month' & !complete.cog)$id,
                 8,
-         ifelse(id %in% subset(all.fu, fu.period == '12 Month' & status == 'Deceased')$id, 5,
-         ifelse(id %in% subset(all.fu,
+         ifelse(id %in% subset(brainmind.fu, fu.period == '12 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(brainmind.fu,
                                fu.period == '12 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
@@ -526,20 +526,20 @@ all.oneobs$twelve.status.cog <- with(all.oneobs, {
                     'Partial cognitive data',
                     'Complete cognitive data')) })
 
-all.oneobs$twelve.status.func <- with(all.oneobs, {
+brainmind.oneobs$twelve.status.func <- with(brainmind.oneobs, {
   factor(ifelse(hosp.status == 'Withdrew and requested data be destroyed', 1,
          ifelse(hosp.status == 'Died in hospital' |
                   three.status.func == 'Died before 3-month followup', 2,
          ifelse(hosp.status == 'Withdrew in hospital' |
                   three.status.func == 'Withdrew before 3-month followup', 3,
          ifelse(hosp.status == 'Survived hospital, but no days with all biomarkers', 4,
-         ifelse(func.cohort.12 & id %in% subset(all.fu, fu.period == '12 Month' & complete.func)$id,
+         ifelse(func.cohort.12 & id %in% subset(brainmind.fu, fu.period == '12 Month' & complete.func)$id,
                 9,
          ifelse(func.cohort.12 &
-                  id %in% subset(all.fu, fu.period == '12 Month' & !complete.func)$id,
+                  id %in% subset(brainmind.fu, fu.period == '12 Month' & !complete.func)$id,
                 8,
-         ifelse(id %in% subset(all.fu, fu.period == '12 Month' & status == 'Deceased')$id, 5,
-         ifelse(id %in% subset(all.fu,
+         ifelse(id %in% subset(brainmind.fu, fu.period == '12 Month' & status == 'Deceased')$id, 5,
+         ifelse(id %in% subset(brainmind.fu,
                                fu.period == '12 Month' &
                                  status == 'Living-Withdrew from the study')$id,
                 6,
@@ -557,10 +557,10 @@ all.oneobs$twelve.status.func <- with(all.oneobs, {
                     'Complete functional data')) })
 
 ## Get Ns for each patient status category
-n.enrolled <- nrow(all.oneobs)
+n.enrolled <- nrow(brainmind.oneobs)
 
 ## In-hospital section
-hosp.table <- table(all.oneobs$hosp.status, useNA = 'ifany')
+hosp.table <- table(brainmind.oneobs$hosp.status, useNA = 'ifany')
 
 n.destroyed <- as.numeric(hosp.table['Withdrew and requested data be destroyed'])
 n.entire <- n.enrolled - n.destroyed
@@ -570,8 +570,8 @@ n.nobio <- as.numeric(hosp.table['Survived hospital, but no days with all biomar
 n.elig.3 <- as.numeric(hosp.table['Survived with >=1 day all biomarkers measured'])
 
 ## 3-month section
-three.cog.table <- table(all.oneobs$three.status.cog, useNA = 'ifany')
-three.func.table <- table(all.oneobs$three.status.func, useNA = 'ifany')
+three.cog.table <- table(brainmind.oneobs$three.status.cog, useNA = 'ifany')
+three.func.table <- table(brainmind.oneobs$three.status.func, useNA = 'ifany')
 
 n.died.3 <- as.numeric(three.cog.table['Died before 3-month followup'])
 n.wd.3 <- as.numeric(three.cog.table['Withdrew before 3-month followup'])
@@ -585,8 +585,8 @@ n.compfunc.3 <- as.numeric(three.func.table['Complete functional data'])
 n.mafunc.3 <- n.partfunc.3 + n.compfunc.3
 
 ## 12-month section
-twelve.cog.table <- table(all.oneobs$twelve.status.cog, useNA = 'ifany')
-twelve.func.table <- table(all.oneobs$twelve.status.func, useNA = 'ifany')
+twelve.cog.table <- table(brainmind.oneobs$twelve.status.cog, useNA = 'ifany')
+twelve.func.table <- table(brainmind.oneobs$twelve.status.func, useNA = 'ifany')
 
 n.elig.12 <- n.nocog.3 + n.macog.3
 n.died.12 <- as.numeric(twelve.cog.table['Died between 3- and 12-month followup'])
@@ -669,11 +669,11 @@ latex(consort.df[,c('rowlab', 'npct')], file = '', title = '',
 @
 
 <<desctables>>=
-desc.data <- all.oneobs %>% left_join(model.fu.data, by = 'id')
+desc.data <- brainmind.oneobs %>% left_join(model.fu.data, by = 'id')
 
 desc.vars <- c('age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqcode.score.e',
                'stroke.risk', 'adl.e', 'faq.e', 'frailty', 'icu.type', 'num.apache', 'sofa',
-               'mean.benz.icu', 'mean.op.new.icu', 'mean.prop.icu', 'mean.dex.icu',
+               'mean.benz.icu', 'mean.op.icu', 'mean.prop.icu', 'mean.dex.icu',
                'mean.hal.icu', 'ever.vent.s', 'vent.los.tot.eo', 'ever.del.s.imp',
                'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo',
                'rbans.global.score.3', 'rbans.global.score.12', 'trail.b.tscore.3',
@@ -682,7 +682,7 @@ desc.vars <- c('age.enroll', 'sex.pp', 'race.pp', 'edu', 'charlson.score', 'iqco
 
 desc.data.all <-
   desc.data[desc.data$id %in%
-              subset(all.oneobs,
+              subset(brainmind.oneobs,
                      had.all.biomarkers &
                        !(studywd.amt %in% c('2. W/D from Participation and All Data Collected',
                                             '4. N/A Study Staff Withdrew Patient')))$id,
@@ -706,7 +706,7 @@ label(desc.data.all$num.apache) = 'APACHE II at ICU admission'
 label(desc.data.all$icu.type) = 'ICU type'
 label(desc.data.all$admit.dx) = 'Primary admission diagnosis'
 label(desc.data.all$mean.benz.icu) = 'Mean 24h benzos in ICU (MDZ equivalents)'
-label(desc.data.all$mean.op.new.icu) = 'Mean 24h opioids in ICU (fentanyl equivalents)'
+label(desc.data.all$mean.op.icu) = 'Mean 24h opioids in ICU (fentanyl equivalents)'
 label(desc.data.all$mean.prop.icu) = 'Mean 24h propofol in ICU'
 label(desc.data.all$mean.dex.icu) = 'Mean 24h dex in ICU'
 label(desc.data.all$mean.hal.icu) = 'Mean 24h haldol in ICU'
@@ -756,11 +756,11 @@ latex(summaryM(admit.dx ~ cohort, data = desc.data.all),
 ## -- Generate plots of descriptive statistics for each biomarker ----------------------------------
 ## Create data set of raw biomarker variables for a) all enrolled patients with biomarker,
 ##  b) all patients with biomarker + long-term outcomes
-bio.values <- all.daily[all.daily$had.all.biomarkers, c('study.day', biomarker.vnames)]
+bio.values <- brainmind.daily[brainmind.daily$had.all.biomarkers, c('study.day', biomarker.vnames)]
 bio.values.longterm <-
-  subset(all.daily,
+  subset(brainmind.daily,
          had.all.biomarkers &
-          id %in% subset(all.oneobs,
+          id %in% subset(brainmind.oneobs,
                          cog.cohort.either | func.cohort.either)$id)[, c('study.day',
                                                                          biomarker.vnames)]
 
@@ -775,7 +775,7 @@ bio.values.cohorts$cohort <- factor(bio.values.cohorts$cohort,
 ## Create data set of biomarker summary variables for a) all enrolled patients with biomarker,
 ##  b) all patients with biomarker + long-term outcomes
 bio.summary.longterm <-
-  subset(bio.summary.wide, id %in% subset(all.oneobs, cog.cohort.either | func.cohort.either)$id)
+  subset(bio.summary.wide, id %in% subset(brainmind.oneobs, cog.cohort.either | func.cohort.either)$id)
 bio.summary.wide$cohort <- 1
 bio.summary.longterm$cohort <- 2
 bio.summary.cohorts <- rbind(bio.summary.wide, bio.summary.longterm)
