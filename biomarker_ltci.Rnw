@@ -36,7 +36,7 @@ library(tidyr)
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'all'
+rerun.analyses <- 'none'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -3067,42 +3067,49 @@ ifngamma.adl.results <- create.results.table(modlist = ifngamma.mods, marker = '
                                              pval.list = ifngamma.func.pvals)
 ifngamma.faq.results <- create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'faq',
                                              pval.list = ifngamma.func.pvals)
+ifngamma.cfs.results <- create.results.table(modlist = ifngamma.mods, marker = 'ifngamma', 'cfs')
 il10.rbans.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'rbans')
 il10.trailb.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'trailb')
 il10.adl.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'adl',
                                          pval.list = il10.func.pvals)
 il10.faq.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'faq',
                                          pval.list = il10.func.pvals)
+il10.cfs.results <- create.results.table(modlist = il10.mods, marker = 'il10', 'cfs')
 il12.rbans.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'rbans')
 il12.trailb.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'trailb')
 il12.adl.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'adl',
                                          pval.list = il12.func.pvals)
 il12.faq.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'faq',
                                          pval.list = il12.func.pvals)
+il12.cfs.results <- create.results.table(modlist = il12.mods, marker = 'il12', 'cfs')
 il1b.rbans.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'rbans')
 il1b.trailb.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'trailb')
 il1b.adl.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'adl',
                                          pval.list = il1b.func.pvals)
 il1b.faq.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'faq',
                                          pval.list = il1b.func.pvals)
+il1b.cfs.results <- create.results.table(modlist = il1b.mods, marker = 'il1b', 'cfs')
 il6.rbans.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'rbans')
 il6.trailb.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'trailb')
 il6.adl.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'adl',
                                         pval.list = il6.func.pvals)
 il6.faq.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'faq',
                                         pval.list = il6.func.pvals)
+il6.cfs.results <- create.results.table(modlist = il6.mods, marker = 'il6', 'cfs')
 il8.rbans.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'rbans')
 il8.trailb.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'trailb')
 il8.adl.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'adl',
                                         pval.list = il8.func.pvals)
 il8.faq.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'faq',
                                         pval.list = il8.func.pvals)
+il8.cfs.results <- create.results.table(modlist = il8.mods, marker = 'il8', 'cfs')
 mmp9.rbans.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'rbans')
 mmp9.trailb.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'trailb')
 mmp9.adl.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'adl',
                                          pval.list = mmp9.func.pvals)
 mmp9.faq.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'faq',
                                          pval.list = mmp9.func.pvals)
+mmp9.cfs.results <- create.results.table(modlist = mmp9.mods, marker = 'mmp9', 'cfs')
 proteinc.rbans.results <-
   create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'rbans')
 proteinc.trailb.results <-
@@ -3111,18 +3118,22 @@ proteinc.adl.results <- create.results.table(modlist = proteinc.mods, marker = '
                                              pval.list = proteinc.func.pvals)
 proteinc.faq.results <- create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'faq',
                                              pval.list = proteinc.func.pvals)
+proteinc.cfs.results <-
+  create.results.table(modlist = proteinc.mods, marker = 'proteinc', 'cfs')
 tnfa.rbans.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'rbans')
 tnfa.trailb.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'trailb')
 tnfa.adl.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'adl',
                                          pval.list = tnfa.func.pvals)
 tnfa.faq.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'faq',
                                          pval.list = tnfa.func.pvals)
+tnfa.cfs.results <- create.results.table(modlist = tnfa.mods, marker = 'tnfa', 'cfs')
 tnfr1.rbans.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'rbans')
 tnfr1.trailb.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'trailb')
 tnfr1.adl.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'adl',
                                           pval.list = tnfr1.func.pvals)
 tnfr1.faq.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'faq',
                                           pval.list = tnfr1.func.pvals)
+tnfr1.cfs.results <- create.results.table(modlist = tnfr1.mods, marker = 'tnfr1', 'cfs')
 
 ## With delirium
 crp.del.rbans.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'rbans')
@@ -3131,6 +3142,7 @@ crp.del.adl.results <- create.results.table(modlist = crp.del.mods, marker = 'cr
                                             pval.list = crp.del.func.pvals)
 crp.del.faq.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'faq',
                                             pval.list = crp.del.func.pvals)
+crp.del.cfs.results <- create.results.table(modlist = crp.del.mods, marker = 'crp', 'cfs')
 ifngamma.del.rbans.results <-
   create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma', 'rbans')
 ifngamma.del.trailb.results <-
@@ -3139,42 +3151,50 @@ ifngamma.del.adl.results <- create.results.table(modlist = ifngamma.del.mods, ma
                                                  'adl', pval.list = ifngamma.del.func.pvals)
 ifngamma.del.faq.results <- create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma',
                                                  'faq', pval.list = ifngamma.del.func.pvals)
+ifngamma.del.cfs.results <-
+  create.results.table(modlist = ifngamma.del.mods, marker = 'ifngamma', 'cfs')
 il10.del.rbans.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'rbans')
 il10.del.trailb.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'trailb')
 il10.del.adl.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'adl',
                                              pval.list = il10.del.func.pvals)
 il10.del.faq.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'faq',
                                              pval.list = il10.del.func.pvals)
+il10.del.cfs.results <- create.results.table(modlist = il10.del.mods, marker = 'il10', 'cfs')
 il12.del.rbans.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'rbans')
 il12.del.trailb.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'trailb')
 il12.del.adl.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'adl',
                                              pval.list = il12.del.func.pvals)
 il12.del.faq.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'faq',
                                              pval.list = il12.del.func.pvals)
+il12.del.cfs.results <- create.results.table(modlist = il12.del.mods, marker = 'il12', 'cfs')
 il1b.del.rbans.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'rbans')
 il1b.del.trailb.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'trailb')
 il1b.del.adl.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'adl',
                                              pval.list = il1b.del.func.pvals)
 il1b.del.faq.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'faq',
                                              pval.list = il1b.del.func.pvals)
+il1b.del.cfs.results <- create.results.table(modlist = il1b.del.mods, marker = 'il1b', 'cfs')
 il6.del.rbans.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'rbans')
 il6.del.trailb.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'trailb')
 il6.del.adl.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'adl',
                                             pval.list = il6.del.func.pvals)
 il6.del.faq.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'faq',
                                             pval.list = il6.del.func.pvals)
+il6.del.cfs.results <- create.results.table(modlist = il6.del.mods, marker = 'il6', 'cfs')
 il8.del.rbans.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'rbans')
 il8.del.trailb.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'trailb')
 il8.del.adl.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'adl',
                                             pval.list = il8.del.func.pvals)
 il8.del.faq.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'faq',
                                             pval.list = il8.del.func.pvals)
+il8.del.cfs.results <- create.results.table(modlist = il8.del.mods, marker = 'il8', 'cfs')
 mmp9.del.rbans.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'rbans')
 mmp9.del.trailb.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'trailb')
 mmp9.del.adl.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'adl',
                                              pval.list = mmp9.del.func.pvals)
 mmp9.del.faq.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'faq',
                                              pval.list = mmp9.del.func.pvals)
+mmp9.del.cfs.results <- create.results.table(modlist = mmp9.del.mods, marker = 'mmp9', 'cfs')
 proteinc.del.rbans.results <-
   create.results.table(modlist = proteinc.del.mods, marker = 'proteinc', 'rbans')
 proteinc.del.trailb.results <-
@@ -3183,18 +3203,22 @@ proteinc.del.adl.results <- create.results.table(modlist = proteinc.del.mods, ma
                                                  'adl', pval.list = proteinc.del.func.pvals)
 proteinc.del.faq.results <- create.results.table(modlist = proteinc.del.mods, marker = 'proteinc',
                                                  'faq', pval.list = proteinc.del.func.pvals)
+proteinc.del.cfs.results <-
+  create.results.table(modlist = proteinc.del.mods, marker = 'proteinc', 'cfs')
 tnfa.del.rbans.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'rbans')
 tnfa.del.trailb.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'trailb')
 tnfa.del.adl.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'adl',
                                              pval.list = tnfa.del.func.pvals)
 tnfa.del.faq.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'faq',
                                              pval.list = tnfa.del.func.pvals)
+tnfa.del.cfs.results <- create.results.table(modlist = tnfa.del.mods, marker = 'tnfa', 'cfs')
 tnfr1.del.rbans.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'rbans')
 tnfr1.del.trailb.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'trailb')
 tnfr1.del.adl.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'adl',
                                               pval.list = tnfr1.del.func.pvals)
 tnfr1.del.faq.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'faq',
                                               pval.list = tnfr1.del.func.pvals)
+tnfr1.del.cfs.results <- create.results.table(modlist = tnfr1.del.mods, marker = 'tnfr1', 'cfs')
 
 
 ## -- Function to print results tables in Latex ----------------------------------------------------
@@ -3262,15 +3286,16 @@ latex.results <- function(resultsdata, markerstr, teststr){
 # summary(il10.mods$pctchg.trailb.wt.12)
 
 ## Functions to plot results from a model, weighted and non-weighted on the same panel -------------
-test.ylabs <- data.frame(testvar = c('rbans', 'trailb', 'adl', 'faq'),
+test.ylabs <- data.frame(testvar = c('rbans', 'trailb', 'adl', 'faq', 'cfs'),
                          testylab = c('Adjusted RBANS Global Score',
                                       'Adjusted Trails B T-Score',
                                       'Adjusted ADL Score',
-                                      'Adjusted FAQ Score'))
+                                      'Adjusted FAQ Score',
+                                      'Adjusted Clinical Frailty Score'))
 
 ## Cognitive outcomes (linear models)
 cogresults.plot <- function(modlist, ## List of model objects (eg, crp.mods)
-                            test = c('rbans', 'trailb'), ## Test of interest
+                            test = c('rbans', 'trailb', 'cfs'), ## Test of interest
                             marker, ## String; biomarker prefix (eg, 'crp')
                             xlab.addon = NULL){ ## Text added to X label (eg "Models W/O Delirium")
 
@@ -4189,6 +4214,125 @@ multiplot(funcresults.plot(modlist = tnfr1.mods, test = 'faq', marker = 'tnfr1',
           funcresults.plot(modlist = tnfr1.del.mods, test = 'faq', marker = 'tnfr1',
                            xlab.addon = 'Models With Delirium'),
           layout = matrix(1:2, ncol = 1))
+
+@
+
+\clearpage
+\section{Biomarkers vs. CSHA Clinical Frailty Score}
+We used linear regression to examine the relationships between biomarkers, measured three different
+ways, and CSHA Clinical Frailty Scores at 3- and 12-month followup. Summary results for each
+association follow, with detailed model results to come. Point esimates (confidence limits)
+represent the adjusted difference in test scores for a patient at the 75th vs. the 25th percentile
+of the biomarker measure, assuming all other covariates are the same.
+
+All patients who had at least one day of complete biomarker data in the ICU and at least partial
+functional testing data at a given time point are included in the models looking at mean and first
+biomarker measurements. In the percent change models, all patients are included who have at least
+two days of complete biomarker data and at least partial functional outcome data. By restricting the
+cohorts to patients with complete biomarker data, we remove the need to impute biomarker data, but
+we do use multiple imputation to impute other missing covariates (education was the only covariate
+with missing data) and to impute missing frailty data. Multiple imputation helps reduce bias; in
+our case, bias would likely come from the sickest patients (ie, most likely to score poorly) not
+completing all functional testing.
+
+All models included the following covariates; all continuous variables (including biomarker) were allowed to have a nonlinear association with the outcome using restricted cubic splines. Mean and first biomarker were transformed by taking the base 10 logarithm, so that extremely high values did not cause
+problems with model convergence.
+
+\begin{itemize}
+\item Age at enrollment
+\item Sex
+\item Charlson score
+\item Years of education
+\item Clinical frailty score at enrollment
+\end{itemize}
+
+Previous analyses showed no meaningful association between frailty and delirium; therefore, we do not present models investigating mediation with delirium included for this outcome.
+
+\clearpage
+\subsection{CRP}
+<<printcrpcfs, results='asis', fig.cap = 'CRP vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(crp.cfs.results, 'CRP', 'Clinical Frailty Scores')
+cogresults.plot(modlist = crp.mods, test = 'cfs', marker = 'crp', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{IFN-$\gamma$}
+<<printifngammacfs, results='asis', fig.cap = 'IFN-gamma vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(ifngamma.cfs.results, 'IFN-gamma', 'Clinical Frailty Scores')
+cogresults.plot(modlist = ifngamma.mods, test = 'cfs', marker = 'ifngamma', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{IL-10}
+<<printil10cfs, results='asis', fig.cap = 'IL-10 vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(il10.cfs.results, 'IL-10', 'Clinical Frailty Scores')
+cogresults.plot(modlist = il10.mods, test = 'cfs', marker = 'il10', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{IL-12}
+<<printil12cfs, results='asis', fig.cap = 'IL-12 vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(il12.cfs.results, 'IL-12', 'Clinical Frailty Scores')
+cogresults.plot(modlist = il12.mods, test = 'cfs', marker = 'il12', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{IL-1$\beta$}
+<<printil1bcfs, results='asis', fig.cap = 'IL-1b vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(il1b.cfs.results, 'IL-1b', 'Clinical Frailty Scores')
+cogresults.plot(modlist = il1b.mods, test = 'cfs', marker = 'il1b', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{IL-6}
+<<printil6cfs, results='asis', fig.cap = 'IL-6 vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(il6.cfs.results, 'IL-6', 'Clinical Frailty Scores')
+cogresults.plot(modlist = il6.mods, test = 'cfs', marker = 'il6', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{IL-8}
+<<printil8cfs, results='asis', fig.cap = 'IL-8 vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(il8.cfs.results, 'IL-8', 'Clinical Frailty Scores')
+cogresults.plot(modlist = il8.mods, test = 'cfs', marker = 'il8', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{MMP9}
+<<printmmp9cfs, results='asis', fig.cap = 'MMP9 vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(mmp9.cfs.results, 'MMP9', 'Clinical Frailty Scores')
+cogresults.plot(modlist = mmp9.mods, test = 'cfs', marker = 'mmp9', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{Protein C}
+<<printproteinccfs, results='asis', fig.cap = 'Protein C vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(proteinc.cfs.results, 'Protein C', 'Clinical Frailty Scores')
+cogresults.plot(modlist = proteinc.mods, test = 'cfs', marker = 'proteinc', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{TNF$\alpha$}
+<<printtnfacfs, results='asis', fig.cap = 'TNF-alpha vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(tnfa.cfs.results, 'TNF-alpha', 'Clinical Frailty Scores')
+cogresults.plot(modlist = tnfa.mods, test = 'cfs', marker = 'tnfa', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+\clearpage
+\subsection{TNFR1}
+<<printtnfr1cfs, results='asis', fig.cap = 'TNFR1 vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
+latex.results(tnfr1.cfs.results, 'TNFR1', 'Clinical Frailty Scores')
+cogresults.plot(modlist = tnfr1.mods, test = 'cfs', marker = 'tnfr1', xlab.addon = 'Adjusted for Covariates')
 
 @
 
