@@ -23,7 +23,6 @@ opts_chunk$set(echo=FALSE, warning = FALSE, message = FALSE, cache = FALSE, erro
 options(replace.assign = TRUE, width = 90)
 
 library(mice)
-# library(ClusterBootMultinom)
 library(MASS)
 library(pscl)
 library(rms)
@@ -31,12 +30,13 @@ library(caTools)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
+library(purrr)
 
 ## -- Indicators for whether to completely rerun analyses, rerun imputed objects, and/or rerun -----
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'none'
+rerun.analyses <- 'all'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -140,23 +140,30 @@ trace(lrm.fix, quote(m$weights <- substitute(weights)), at=9)
 
 <<loaddata>>=
 ## Create vector of variable names of each biomarker
-biomarker.vnames <- paste0(c('crp', 'ifngamma', 'il10', 'il12', 'il1b', 'il6', 'il8', 'mmp9',
-                             'proteinc', 'tnfa', 'tnfr1'),
-                           '.imp')
+biomarker.vnames <- paste0(
+  c('crp', 'ifngamma', 'il10', 'il12', 'il1b', 'il6', 'il8', 'mmp9', 'proteinc',
+    'tnfa', 'tnfr1'),
+  '.imp'
+)
 
-## Load all BRAIN data
+## Load all BRAIN+MINDICU data
 if(Sys.info()['sysname'] == 'Darwin'){
   if(length(grep('Volumes', getwd())) > 0){
-    load('/Volumes/thomps23/ICUDelirium/BRAINMIND/CombineData/brainmind_deid.Rdata')
+    load('/Volumes/thomps23/ICUDelirium/BRAINMIND/CombineData/analysisdata/brainmind_deid.Rdata')
     source('/Volumes/thomps23/R/multiplot.r')
   } else{
     load('brainmind_deid.Rdata')
     source('multiplot.r')
   }
 } else{
-  load('/home/thomps23/ICUDelirium/BRAINMIND/CombineData/brainmind_deid.Rdata')
+  load('/home/thomps23/ICUDelirium/BRAINMIND/CombineData/analysisdata/brainmind_deid.Rdata')
   source('/home/thomps23/R/multiplot.r')
 }
+
+## Read in cohort indicators (specifically need biomarker, followup indicators)
+inhosp_ind <- readRDS("../../BRAINMIND/CombineData/cohorttables/inhosp_cohorts.rds")
+status_ind <- readRDS("../../BRAINMIND/CombineData/cohorttables/overall_status.rds")
+fu_ind <- readRDS("../../BRAINMIND/CombineData/cohorttables/fu_cohorts.rds")
 
 ## Create cube root versions of all mean 24h ICU drug variables
 brainmind.oneobs$mean.benz.cube <- brainmind.oneobs$mean.benz.icu^(1/3)
@@ -173,18 +180,19 @@ label(brainmind.oneobs$mean.hal.cube) <- 'Mean 24h haldol in ICU, cube root'
 
 @
 
-The following analyses examine the associations between a panel of \Sexpr{length(biomarker.vnames)}
-biomarkers measured in the BRAIN-ICU and MIND-ICU cohorts and long-term cognitive and functional
-outcomes.
+The following analyses examine the associations between a panel of \Sexpr{length(biomarker.vnames)} biomarkers measured in the BRAIN-ICU and MIND-ICU cohorts
+and long-term cognitive and functional outcomes.
 
 \section{Cohort Definitions}
-Cohorts are defined separately for each time point (3 and 12 months) and for cognitive and
-functional outcomes, since patients could have at least some functional testing done by phone. To be
-included in any analyses, patients must have had at least one day with all biomarkers measured while
-in the ICU. Patients are included in the cognitive cohort if they had at least one cognitive test performed at the specified time point (including any RBANS domains, Trails A, Trails B and/or MMSE).
-Patients are included in the functional cohort if they had at least one functional test performed at
-the specified time point (BDI-II, PCL, ADL, FAQ, SF36 mental or physical component, and/or CSHA
-frailty).
+Cohorts are defined separately for each time point (3 and 12 months) and for
+cognitive and functional outcomes, since patients could have at least some
+functional testing done by phone. To be included in any analyses, patients must
+have had at least one biomarker measured in the ICU. Patients are included in
+the cognitive cohort if they had at least one cognitive test performed at the
+specified time point (including any RBANS domains, Trails A, and/or Trails B).
+Patients are included in the functional cohort if they had at least one
+functional test performed at the specified time point (BDI-II, PCL, ADL, FAQ,
+SF36 mental or physical component, and/or CSHA frailty).
 
 <<datamgmt>>=
 ## -- Indicator for whether patient has any biomarkers measured on any study day -------------------
@@ -198,7 +206,7 @@ brainmind.oneobs$had.all.biomarkers <- brainmind.oneobs$id %in% subset(brainmind
 ## Create vectors of tests included in "partial data" criteria at each time point for each cohort
 cog.varnames <- c('rbans.global.score', 'rbans.immmemory.tscore', 'rbans.visuo.tscore',
                   'rbans.delayedmem.tscore', 'rbans.language.tscore', 'trail.a.tscore',
-                  'trail.b.tscore', 'mmse.tscore')
+                  'trail.b.tscore')
 func.varnames <- c('bdi.totscore', 'pcl.totscore', 'adl.totscore', 'faq.totscore',
                    'sf36.pcs', 'sf36.mcs', 'frailty.fu')
 
@@ -213,14 +221,28 @@ brainmind.fu$complete.func <- ifelse(!brainmind.fu$has.func.data, NA,
                                rowSums(!is.na(brainmind.fu[,func.varnames])) == length(func.varnames))
 
 ## Create indicators for whether patient is in cohort at each time
-brainmind.oneobs$cog.cohort.3 <- brainmind.oneobs$had.all.biomarkers &
-  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '3 Month' & has.cog.data)$id
-brainmind.oneobs$cog.cohort.12 <- brainmind.oneobs$had.all.biomarkers &
-  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '12 Month' & has.cog.data)$id
-brainmind.oneobs$func.cohort.3 <- brainmind.oneobs$had.all.biomarkers &
-  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '3 Month' & has.func.data)$id
-brainmind.oneobs$func.cohort.12 <- brainmind.oneobs$had.all.biomarkers &
-  brainmind.oneobs$id %in% subset(brainmind.fu, fu.period == '12 Month' & has.func.data)$id
+## NOTE: 14050 is recorded as withdrawing in the hospital, but has followup data;
+## We are taking the conservative approach of not using this patient's f/u data.
+brainmind.oneobs$cog.cohort.3 <- with(brainmind.oneobs, {
+  had.all.biomarkers &
+    id %in% subset(brainmind.fu, fu.period == '3 Month' & has.cog.data)$id &
+    !(id == 14050)
+})
+brainmind.oneobs$cog.cohort.12 <- with(brainmind.oneobs, {
+  had.all.biomarkers &
+    id %in% subset(brainmind.fu, fu.period == '12 Month' & has.cog.data)$id &
+    !(id == 14050)
+})
+brainmind.oneobs$func.cohort.3 <- with(brainmind.oneobs, {
+  had.all.biomarkers &
+    id %in% subset(brainmind.fu, fu.period == '3 Month' & has.func.data)$id &
+    !(id == 14050)
+})
+brainmind.oneobs$func.cohort.12 <- with(brainmind.oneobs, {
+  had.all.biomarkers &
+    id %in% subset(brainmind.fu, fu.period == '12 Month' & has.func.data)$id &
+    !(id == 14050)
+})
 
 ## Create indicators for whether patient is in each cohort at either time, for Table 1
 brainmind.oneobs$cog.cohort.either <- brainmind.oneobs$cog.cohort.3 | brainmind.oneobs$cog.cohort.12
@@ -761,7 +783,7 @@ latex(summaryM(formula(paste(paste(desc.vars, collapse = ' + '), '~ cohort')),
       npct = 'both',
       exclude1 = FALSE,
       landscape = TRUE,
-      size = 'footnotesize',
+      size = 'scriptsize',
       prmsd = TRUE)
 
 latex(summaryM(admit.dx ~ cohort, data = desc.data.all),
