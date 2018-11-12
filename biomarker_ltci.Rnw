@@ -4,7 +4,7 @@
 \documentclass{article}
 
 %\usepackage[margin=.5in, landscape]{geometry} %resets margins
-\usepackage[margin=.5in]{geometry} %resets margins
+\usepackage[margin=.35in]{geometry} %resets margins
 \usepackage{hyperref}
 \usepackage{lscape}
 \usepackage{pdfpages}
@@ -36,7 +36,7 @@ library(purrr)
 ## -- models only ----------------------------------------------------------------------------------
 
 ## rerun.analyses should be one of "none", "models", "imputed", "all"
-rerun.analyses <- 'all'
+rerun.analyses <- 'none'
 
 rerun.imputed <- rerun.models <- NULL
 if(rerun.analyses == 'none'){
@@ -719,7 +719,8 @@ desc.vars <- c(
   'stroke.risk', 'adl.e', 'faq.e', 'frailty', 'icu.type', 'num.apache', 'sofa',
   'mean.benz.icu', 'mean.op.icu', 'mean.prop.icu', 'mean.dex.icu',
   'mean.hal.icu', 'ever.vent.s', 'vent.los.tot.eo', 'ever.del.s.imp',
-  'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo',
+  'del.s.imp.eo', 'ever.coma.s.imp', 'coma.s.imp.eo', 'ever.sevseptic.s',
+  'icudays.sevseptic.eo',
   'rbans.global.score.3', 'rbans.global.score.12', 'trail.b.tscore.3',
   'trail.b.tscore.12', 'adl.totscore.3', 'adl.totscore.12', 'faq.totscore.3',
   'faq.totscore.12', 'frailty.fu.3', 'frailty.fu.12'
@@ -4355,6 +4356,101 @@ cogresults.plot(modlist = tnfa.mods, test = 'cfs', marker = 'tnfa', xlab.addon =
 <<printtnfr1cfs, results='asis', fig.cap = 'TNFR1 vs. Clinical Frailty Scores', fig.align = 'center', fig.width = 10, fig.height = 4.5, fig.pos = '!h'>>=
 latex.results(tnfr1.cfs.results, 'TNFR1', 'Clinical Frailty Scores')
 cogresults.plot(modlist = tnfr1.mods, test = 'cfs', marker = 'tnfr1', xlab.addon = 'Adjusted for Covariates')
+
+@
+
+%% -- Code for publication figures ---------------------------------------------
+% 
+<<forestplot>>=
+## -- Create data.frame of all model results at all time points ----------------
+forest_results <- map2_df(
+  .x = rep(gsub("\\.imp$", "", biomarker.vnames), 4),
+  .y = rep(c("rbans", "trailb", "adl", "faq"), each = length(biomarker.vnames)),
+  ~ get(paste(.x, .y, "results", sep = ".")) %>% mutate(marker = .x, test = .y)
+) %>%
+  ## Only need mean biomarker rows, estimates/CIs
+  filter(measure.str == "Log10(Mean)") %>%
+  dplyr::select(marker, test, starts_with("wt")) %>%
+  ## Reshape so that each time point is a separate line
+  gather(key = timept, value = est_ci, starts_with("wt")) %>%
+  ## Extract estimate, confidence limits, p-values from character string
+  separate(
+    est_ci, into = c("est", "lcl", "ucl", "pval"), sep = " \\(|, |\\); P = "
+  ) %>%
+  ## Turn estimate, CIs, p into numeric
+  mutate_at(vars(-marker, -test, -timept), as.numeric) %>%
+  mutate(
+    ## Add reference values, formatting
+    timept = factor(
+      ifelse(timept == "wt.3", 2, 1),
+      levels = 1:2, labels = c("12 Months", "3 Months")
+    ),
+    refline = ifelse(test %in% c("rbans", "trailb"), 0, 1),
+    test = factor(
+      case_when(
+        test == "rbans" ~ 1,
+        test == "trailb" ~ 2,
+        test == "adl" ~ 3,
+        TRUE ~ 4
+      ),
+      levels = 1:4,
+      labels = c("Difference in RBANS\n(95% CI)",
+                 "Difference in Trails B\n(95% CI)",
+                 "Odds Ratio, Higher Katz ADL \n(95% CI)",
+                 "Odds Ratio, Higher FAQ \n(95% CI)")
+    ),
+    marker = factor(
+      case_when(
+        marker == "crp" ~ 11,
+        marker == "ifngamma" ~ 10,
+        marker == "il1b" ~ 9,
+        marker == "il6" ~ 8,
+        marker == "il8" ~ 7,
+        marker == "il10" ~ 6,
+        marker == "il12" ~ 5,
+        marker == "mmp9" ~ 4,
+        marker == "tnfa" ~ 3,
+        marker == "tnfr1" ~ 2,
+        TRUE ~ 1
+      ),
+      levels = 1:11,
+      labels = c(
+        "Protein C", "TNFR1", "TNF-a", "MMP-9", "IL-12", "IL-10", "IL-8",
+        "IL-6", "IL-1b", "IFN-g", "CRP"
+      )
+    )
+  )
+
+forest_plot <- ggplot(data = forest_results) +
+  aes(y = est, x = marker, group = timept, color = timept, shape = timept) +
+  facet_wrap(~ test, scales = "free_x") +
+  geom_hline(aes(yintercept = refline), linetype = "dotted", color = "gray50") +
+  geom_pointrange(
+    aes(ymin = lcl, ymax = ucl), position = position_dodge(width = 0.8)
+  ) +
+  scale_colour_manual(
+    values = c("#790001", "#003D74"),
+    guide = guide_legend(reverse = TRUE), name = ""
+  ) +
+  scale_shape(guide = guide_legend(reverse = TRUE), name = "") +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal",
+    panel.background = element_rect(fill = NA, colour = "gray70"),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    axis.title = element_blank()
+  )
+
+ggsave(
+  filename = "forest_plot.pdf",
+  forest_plot,
+  device = "pdf",
+  width = 7, height = 10
+)
 
 @
 
