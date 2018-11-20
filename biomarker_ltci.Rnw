@@ -4396,8 +4396,8 @@ forest_results <- map2_df(
       levels = 1:4,
       labels = c("Difference in RBANS\n(95% CI)",
                  "Difference in Trails B\n(95% CI)",
-                 "Odds Ratio, Higher Katz ADL \n(95% CI)",
-                 "Odds Ratio, Higher FAQ \n(95% CI)")
+                 "Incidence Rate Ratio, Katz ADL \n(95% CI)",
+                 "Incidence Rate Ratio, FAQ \n(95% CI)")
     ),
     marker = factor(
       case_when(
@@ -4421,18 +4421,53 @@ forest_results <- map2_df(
     )
   )
 
-forest_plot <- ggplot(data = forest_results) +
+## -- Wrapper functions for facet axis breaks (thanks, Jim Hester!) ------------
+forest_breaks <- function(x){
+  if (max(x) <= 2) seq(0.5, 1.5, 0.25) else seq(-4, 4, 1)
+}
+
+forest_plot_cog <- ggplot(
+  data = forest_results %>% filter(stringr::str_detect(test, "^Difference"))
+) +
   aes(y = est, x = marker, group = timept, color = timept, shape = timept) +
-  facet_wrap(~ test, scales = "free_x") +
+  facet_wrap(~ test) +
   geom_hline(aes(yintercept = refline), linetype = "dotted", color = "gray50") +
   geom_pointrange(
-    aes(ymin = lcl, ymax = ucl), position = position_dodge(width = 0.8)
+    aes(ymin = lcl, ymax = ucl), position = position_dodge(width = 0.7)
   ) +
   scale_colour_manual(
     values = c("#790001", "#003D74"),
     guide = guide_legend(reverse = TRUE), name = ""
   ) +
   scale_shape(guide = guide_legend(reverse = TRUE), name = "") +
+  scale_y_continuous(limits = c(-4, 4.1), breaks = seq(-4, 4, 1)) +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal",
+    panel.background = element_rect(fill = NA, colour = "gray70"),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    axis.title = element_blank()
+  )
+
+forest_plot_func <- ggplot(
+  data = forest_results %>% filter(stringr::str_detect(test, "^Incidence"))
+) +
+  aes(y = est, x = marker, group = timept, color = timept, shape = timept) +
+  facet_wrap(~ test) +
+  geom_hline(aes(yintercept = refline), linetype = "dotted", color = "gray50") +
+  geom_pointrange(
+    aes(ymin = lcl, ymax = ucl), position = position_dodge(width = 0.7)
+  ) +
+  scale_colour_manual(
+    values = c("#790001", "#003D74"),
+    guide = guide_legend(reverse = TRUE), name = ""
+  ) +
+  scale_shape(guide = guide_legend(reverse = TRUE), name = "") +
+  scale_y_continuous(limits = c(0.5, 1.55), breaks = seq(0.5, 1.5, 0.25)) +
   coord_flip() +
   theme_minimal() +
   theme(
@@ -4447,7 +4482,7 @@ forest_plot <- ggplot(data = forest_results) +
 
 ggsave(
   filename = "forest_plot.pdf",
-  forest_plot,
+  multiplot(forest_plot_cog, forest_plot_func, layout = matrix(1:2, ncol = 1)),
   device = "pdf",
   width = 7, height = 10
 )
